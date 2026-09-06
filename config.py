@@ -1,0 +1,103 @@
+"""Shared constants for CHAOS Arcade."""
+
+from __future__ import annotations
+
+from enum import Enum
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+ASSETS_DIR = ROOT / "assets"
+DATA_DIR = ROOT / "data"
+
+INTERNAL_W = 1280
+INTERNAL_H = 720
+FPS = 60
+HUD_H = 80
+FOOTER_H = 96
+
+COLOR_BG = (11, 13, 16)
+COLOR_HUD = (244, 241, 234)
+COLOR_CYAN = (45, 226, 230)
+COLOR_AMBER = (255, 183, 3)
+COLOR_DANGER = (255, 59, 59)
+COLOR_PINK = (255, 122, 217)
+COLOR_SKY = (59, 209, 255)
+COLOR_ORANGE = (255, 159, 28)
+COLOR_CHAOS_GREEN = (124, 255, 58)
+COLOR_MAZE_FILL = (18, 22, 28)
+
+MS_RED = (243, 83, 37)
+MS_GREEN = (129, 188, 6)
+MS_BLUE = (5, 166, 240)
+MS_YELLOW = (255, 186, 8)
+MS_COLORS = (MS_RED, MS_GREEN, MS_BLUE, MS_YELLOW)
+
+INACTIVITY_SECONDS = 30.0
+ATTRACT_IDLE_SECONDS = 12.0
+ATTRACT_MAX_SECONDS = 40.0
+NAME_ENTRY_SECONDS = 20.0
+BURN_IN_IDLE_SECONDS = 180.0
+BURN_IN_SHIFT_SECONDS = 30.0
+AXIS_DEADZONE = 0.45
+HAT_Y_INVERT = True
+
+START_BUTTONS = {0, 1, 7, 9}
+OPERATOR_BUTTONS = {6, 7, 8, 9}
+
+TILE_SIZE = 32
+NAME_MIN_LEN = 3
+NAME_MAX_LEN = 8
+NAME_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-"
+NAME_BLOCKLIST = ("XXX", "KKK", "FUCK", "SHIT", "NAZI")
+
+GAME_OVER_HOLD = 1.2
+GAME_OVER_IDLE = 6.0
+
+FONT_CANDIDATES = (
+    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+    "/usr/share/fonts/TTF/DejaVuSansMono-Bold.ttf",
+)
+
+
+class GameId(Enum):
+    PACMAN = "PACMAN"
+    DONKEY_KONG = "DONKEY_KONG"
+    SNAKE = "SNAKE"
+    BUBBLE_SHOT = "BUBBLE_SHOT"
+    FROGGER = "FROGGER"
+    INVADERS = "INVADERS"
+    BREAKOUT = "BREAKOUT"
+
+
+GAME_ORDER: tuple[GameId, ...] = (
+    GameId.PACMAN,
+    GameId.DONKEY_KONG,
+    GameId.SNAKE,
+    GameId.BUBBLE_SHOT,
+    GameId.FROGGER,
+    GameId.INVADERS,
+    GameId.BREAKOUT,
+)
+
+GAME_TITLES: dict[GameId, str] = {
+    GameId.PACMAN: "PAC-MAN",
+    GameId.DONKEY_KONG: "DONKEY KONG",
+    GameId.SNAKE: "SNAKE",
+    GameId.BUBBLE_SHOT: "BUBBLE SHOT",
+    GameId.FROGGER: "FROGGER",
+    GameId.INVADERS: "INVADERS",
+    GameId.BREAKOUT: "BREAKOUT",
+}
+
+GAME_BLURBS: dict[GameId, str] = {
+    GameId.PACMAN: "ISS DAS SHELFWARE",
+    GameId.DONKEY_KONG: "KLIMM ZUM VERTRAG",
+    GameId.SNAKE: "FRISS UNGENUTZTE SEATS",
+    GameId.BUBBLE_SHOT: "SORTIER DIE SKUS",
+    GameId.FROGGER: "QUER DURCHS RENEWAL",
+    GameId.INVADERS: "SCHIESS DEN AUDIT AB",
+    GameId.BREAKOUT: "BRICH DEN LOCK-IN",
+}
+
+SKU_NAMES = ("BASIS", "PREMIUM", "FRONTLINE", "ADDON", "SANDBOX")
