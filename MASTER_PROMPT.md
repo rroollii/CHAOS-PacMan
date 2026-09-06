@@ -8,6 +8,9 @@
 **Eingabe:** 8BitDo DIY Kit (Bluetooth Arcade-Stick) + Tastatur-Pfeiltasten  
 **Spieler-Asset:** `assets/logo.svg` (Firmenlogo, Vektor) — **in jedem Spiel** die Spielfigur  
 **Betriebsart:** Unbeaufsichtigtes Messe-Kiosk am digitalen Pult  
+**Öffentliche Bedienung:** nur das **freigeschaltete** Spiel starten/spielen — kein öffentlicher Spielwechsel  
+**Operator-Spielwechsel:** nur über versteckte Tastenkombination (siehe 2.3.5)  
+**Highscore:** Namenspflicht, Top-10 **je Spiel**, sichtbar in jedem Nicht-Spiel-State  
 
 **Spielkatalog (verbindlich, genau diese fünf, in dieser Reihenfolge):**
 
@@ -19,7 +22,7 @@
 | `BUBBLE_SHOT` | BUBBLE SHOT | Puzzle Bobble / Bubble Shooter | Zielen, schießen, 3er-Match |
 | `FROGGER` | FROGGER | Frogger | Straßen/Fluss queren, 5 Ziele |
 
-Dieses Dokument ist verbindlich. CHAOS Arcade ist **kein** reiner Pac-Man-Klon. Pac-Man ist das **erste** Spiel im Kabinett, nicht das einzige. Jede nachfolgende Implementierung muss sich **wortgetreu** an diese Vorgaben halten. Abweichungen sind nur zulässig, wenn sie einen Laufzeitfehler auf dem Raspberry Pi 5 verhindern — und müssen dann im Code kommentiert werden.
+Dieses Dokument ist verbindlich. CHAOS Arcade ist **kein** reiner Pac-Man-Klon. Pac-Man ist das **erste** Spiel im Kabinett und der **Default** nach Erststart, nicht das einzige. Besucher spielen immer nur das vom Operator freigeschaltete Spiel. Jede nachfolgende Implementierung muss sich **wortgetreu** an diese Vorgaben halten. Abweichungen sind nur zulässig, wenn sie einen Laufzeitfehler auf dem Raspberry Pi 5 verhindern — und müssen dann im Code kommentiert werden.
 
 Rechtlicher Rahmen: Es werden **keine** originalen ROM-Assets, Sprites, Melodien oder Markenzeichen Dritter eingebettet. Mechanik und Feeling dürfen anklingen; visuelle Identität ist ausschließlich CHAOS (Logo + Neon-Palette).
 
@@ -29,13 +32,15 @@ Rechtlicher Rahmen: Es werden **keine** originalen ROM-Assets, Sprites, Melodien
 
 ### 0.1 Betriebsziel
 
-CHAOS Arcade ist ein **Multi-Game-Mitmach-Kabinett**. Ein Messebesucher greift zum Arcade-Stick, wählt in ≤ 5 Sekunden ein Spiel, spielt eine kurze Runde, sieht den Score, und das Gerät kehrt selbstständig zur Spielauswahl zurück.
+CHAOS Arcade ist ein **Multi-Game-Mitmach-Kabinett mit gesperrtem Titel**. Ein Messebesucher greift zum 8BitDo-Arcade-Stick, sieht das **aktuell freigeschaltete** Spiel plus dessen Top-10, startet in ≤ 3 Sekunden eine kurze Runde, gibt bei Top-10-Qualifikation **zwingend** seinen Namen ein, und das Gerät kehrt selbstständig zum Idle-Screen desselben Spiels zurück.
 
-- Es gibt **kein** Dateimenü, **kein** OS-UI, **kein** Beenden über sichtbare Buttons.
-- Vollbild-Verlassen nur über verstecktes Operator-Hotkey (siehe 2.5).
-- Jedes der fünf Spiele muss **allein mit Stick + einem Action-Button** bedienbar sein.
+- Es gibt **kein** öffentliches Spielemenü, **kein** Carousel, **kein** Dateimenü, **kein** OS-UI, **kein** Beenden über sichtbare Buttons.
+- Links/Rechts **wechselt das Spiel nicht**. Spielwechsel nur über die Operator-Kombination (2.3.5). Kein On-Screen-Hinweis darauf.
+- Vollbild-Verlassen nur über verstecktes Operator-Hotkey (siehe 2.3.4 / 2.5).
+- Jedes der fünf Spiele muss **allein mit Stick + einem Action-Button** bedienbar sein. Namenseingabe ebenfalls nur mit Stick + Action/Start.
 - Typische Runde: **30–90 Sekunden**. Kein Spiel darf eine Einarbeitungszeit > 3 Sekunden brauchen.
 - Das Firmenlogo ist in **allen** Spielen der Avatar (Mund/Kopf, Kletterer, Schlangenkopf, Kanone/Kugel, Springer).
+- Solange **nicht** gespielt wird (`GAME_SELECT`, `ATTRACT_MODE`, `GAME_OVER`, `NAME_ENTRY`), ist die **Top-10 des aktuellen Spiels** sichtbar — mit Rang, Name, Score.
 
 ### 0.2 Hardware-Annahmen
 
@@ -52,7 +57,7 @@ CHAOS Arcade ist ein **Multi-Game-Mitmach-Kabinett**. Ein Messebesucher greift z
 
 - Feste Logik-Tickrate: **60 Hz** (`CLOCK.tick(60)`).
 - Kein per-frame SVG-Re-Rendering. Vektoren werden **einmal** beim Start (und bei Fenster-Resize) in Surfaces gerastert.
-- Pro Frame maximal die aktive Spielszene plus HUD. Inaktive Games werden nicht simuliert (außer Attract-Demo des aktuellen Slots).
+- Pro Frame maximal die aktive Spielszene plus HUD. Inaktive Games werden nicht simuliert (außer Attract-Demo des featured Game).
 - Keine Blocking-I/O im Game-Loop. Highscore-Schreiben erfolgt atomar und kurz.
 - Ziel: stabil ≥ 50 FPS auf Pi 5 bei 1280×720, **in jedem** der fünf Spiele.
 
@@ -75,8 +80,9 @@ CHAOS_PacMan/
 ├── config.py               # Shared Konstanten, Farben, Timing, Display
 ├── input_map.py            # Keyboard + Gamepad-Mapping
 ├── assets_loader.py        # SVG-Pipeline + Fallback-Logo
-├── states.py               # Shell-States: SELECT, ATTRACT, PLAYING, GAME_OVER
-├── highscore.py            # JSON Persistenz, getrennt pro GameId
+├── states.py               # Shell-States: SELECT, ATTRACT, PLAYING, GAME_OVER, NAME_ENTRY
+├── highscore.py            # JSON Persistenz + Name, getrennt pro GameId
+├── cabinet.py              # featured GameId Persistenz (Operator-Wahl)
 ├── game_mode.py            # ABC GameMode
 ├── games/
 │   ├── pacman/
@@ -96,18 +102,20 @@ CHAOS_PacMan/
 │   └── frogger/
 │       ├── lanes.py
 │       └── mode.py
-├── attract.py              # Demo-Steuerung, rotiert durch alle Games
+├── attract.py              # Demo nur des featured Game; keine Titelrotation
 ├── assets/
 │   └── logo.svg            # Firmenlogo (kann fehlen)
 ├── data/
-│   └── highscores.json     # wird zur Laufzeit erzeugt
+│   ├── highscores.json     # wird zur Laufzeit erzeugt
+│   └── cabinet.json        # featured GameId; wird zur Laufzeit erzeugt
 ├── requirements.txt
 ├── setup_pi5.sh
+├── .gitignore              # data/*.json, __pycache__, .venv
 ├── MASTER_PROMPT.md
 └── README.md
 ```
 
-Die erste Auslieferung darf alles in `main.py` vereinen, **muss** aber `GameId`, `GameMode` und die fünf Mode-Klassen (`PacmanMode`, `DonkeyKongMode`, `SnakeMode`, `BubbleShotMode`, `FroggerMode`) namentlich enthalten.
+Die erste Auslieferung darf alles in `main.py` vereinen, **muss** aber `GameId`, `GameMode`, `CabinetStore`, `HighscoreStore`, `StateId.NAME_ENTRY` und die fünf Mode-Klassen (`PacmanMode`, `DonkeyKongMode`, `SnakeMode`, `BubbleShotMode`, `FroggerMode`) namentlich enthalten.
 
 ### 0.6 Visuelle Identität (Arcade / CHAOS)
 
@@ -235,8 +243,8 @@ registry = {
     BUBBLE_SHOT: BubbleShotMode,
     FROGGER: FroggerMode,
 }
-state = GAME_SELECT          # nicht mehr direkt PACMAN
-selected = GameId.PACMAN
+featured = CabinetStore.load()          # persistiert; Default PACMAN
+state = GAME_SELECT                     # Idle des featured Game — kein öffentliches Menü
 last_input_ts = now
 while running:
     dt = clock.tick(60) / 1000.0
@@ -246,8 +254,8 @@ while running:
         last_input_ts = now
     state.on_command(command)
     state.update(dt)
-    if now - last_input_ts >= INACTIVITY_SECONDS:
-        force_transition(GAME_SELECT)
+    if state != NAME_ENTRY and now - last_input_ts >= INACTIVITY_SECONDS:
+        force_transition(GAME_SELECT)   # NAME_ENTRY hat eigenen 20-s-Timer
     state.draw(screen)
     pygame.display.flip()
 ```
@@ -258,51 +266,81 @@ Nur das **aktive** `GameMode` erhält `update`/`draw`. `dt` in Sekunden, zeitbas
 
 ```
 class StateId(Enum):
-    GAME_SELECT = "GAME_SELECT"
+    GAME_SELECT = "GAME_SELECT"   # Idle / Titel des featured Game + Top-10
     ATTRACT_MODE = "ATTRACT_MODE"
     PLAYING = "PLAYING"
     GAME_OVER = "GAME_OVER"
+    NAME_ENTRY = "NAME_ENTRY"
 ```
 
-`START_SCREEN` entfällt. Der Titel sitzt in `GAME_SELECT`.
+`START_SCREEN` entfällt. Ein öffentliches Spiele-Carousel **existiert nicht**.  
+`GAME_SELECT` ist der Idle-Screen des **einen** freigeschalteten Titels.
 
 `GameState`: `enter()`, `exit()`, `on_command(cmd)`, `update(dt)`, `draw(surf)`.  
 `Game.change_state(new_id)` ruft `exit()` dann `enter()`.
 
-#### 2.2.1 GAME_SELECT
+`featured: GameId` ist Shell-Zustand, nicht Spielerwahl. Persistenz über `CabinetStore` (`data/cabinet.json`). Erststart: `PACMAN`. Operator-Wechsel schreibt sofort.
 
-- Oben: Logo 160 px + Titel `CHAOS ARCADE`.
-- Mitte: **horizontale Carousel** der fünf Spiele. Aktives Spiel größer (Scale 1.0), Nachbarn 0.72, dimmed.
-- Unter dem Slot: UI-Titel + eine Zeile Mechanik (`ISS DASS LABYRINTH` etc. — kurz, deutsch, max. 28 Zeichen).
-- Unten: `HI-SCORE` des **selektierten** Spiels, 6-stellig; blinkend `◀ WÄHLEN   START SPIELEN ▶`.
-- Links/Rechts bzw. Stick X wechselt `selected` (wrap: Pac-Man ↔ Frogger).
-- `command.start` oder `command.any_action` → `PLAYING` mit `registry[selected].reset()`.
-- Nach `ATTRACT_IDLE_SECONDS = 12` ohne Input → `ATTRACT_MODE`.
-- Select-Wechsel ist `activity` und hält den Attract-Timer.
+#### 2.2.1 GAME_SELECT (Idle)
 
-Carousel-Reihenfolge fest: Pac-Man, Donkey Kong, Snake, Bubble Shot, Frogger.
+Kein Carousel. Keine Nachbar-Spiele. Kein `◀ WÄHLEN ▶`.
+
+Layout (1280×720):
+
+- Oben: Logo 160 px + `CHAOS ARCADE` + UI-Titel des **featured** Game (z. B. `PAC-MAN`).
+- Eine Zeile Mechanik des featured Game (deutsch, max. 28 Zeichen).
+- Mitte/rechts: **Top-10-Tafel** dieses Spiels (Pflicht, siehe 2.3.6). Leere Plätze als `---  --------    000000`.
+- Unten blinkend: `START SPIELEN` — kein Hinweis auf andere Titel, keine Pfeile.
+
+Eingabe:
+
+- `command.start` oder `command.any_action` → `PLAYING` mit `registry[featured].reset()`.
+- `command.dx` / `command.dy` **ohne** Operator-Modifier: ignorieren (kein Titelwechsel, kein Listen-Scroll nötig — 10 Zeilen passen).
+- Operator-Kombo (2.3.5) wechselt `featured`, lädt die neue Top-10, bleibt in `GAME_SELECT`.
+- Nach `ATTRACT_IDLE_SECONDS = 12` ohne Input → `ATTRACT_MODE` desselben featured Game.
 
 #### 2.2.2 ATTRACT_MODE
 
-- Spielt eine **deterministische Demo** des aktuell (oder zuletzt) selektierten Spiels, dann rotiert alle `ATTRACT_ROTATE_SECONDS = 8` zum nächsten `GameId`.
+- Spielt eine **deterministische Demo nur des featured Game**. **Keine** Rotation zu anderen `GameId`. `ATTRACT_ROTATE_SECONDS` entfällt.
 - HUD: `DEMO` + Spielname.
-- Jeder Input → sofort `GAME_SELECT` (nicht direkt ins Spiel).
+- **Top-10-Tafel** des featured Game bleibt sichtbar (rechte oder untere Leiste, Demo darf nicht die Namen verdecken).
+- Jeder **öffentliche** Input → sofort `GAME_SELECT` (nicht direkt ins Spiel).
+- Operator-Kombo in Attract: setzt `featured` neu, bricht Attract ab → `GAME_SELECT` des neuen Titels.
 - Attract schreibt **keine** Highscores und verbraucht keine Leben persistent.
-- Gesamtdauer einer Attract-Session max. 40 s, danach zurück `GAME_SELECT` (Idle-Loop: Select 12 s → Attract → Select).
+- Gesamtdauer einer Attract-Session max. 40 s, danach zurück `GAME_SELECT` (Idle-Loop: Select 12 s → Attract → Select, immer dasselbe featured Game).
 
 #### 2.2.3 PLAYING
 
-- Instanziiert genau ein `GameMode`.
+- Instanziiert genau `registry[featured]`.
 - HUD oben 80 px: Spielname, Score, Leben/Versuche, Level.
+- Die Top-10-Tafel **ruht** während `PLAYING` (nur laufender Score im HUD).
 - Pause existiert **nicht**.
 - `GameMode` signalisiert Ende über `Result.GAME_OVER` oder `Result.QUIT_TO_SELECT` (letzteres nur durch Inaktivität der Shell).
 - Leben, Tempo, Level-Steigerung: **pro Spiel** in §3.x, nicht global identisch.
+- Operator-Spielwechsel ist in `PLAYING` **gesperrt** (kein Mid-Game-Switch).
 
 #### 2.2.4 GAME_OVER
 
-- Overlay: Spielname, `GAME OVER`, Score, Rang in der **spieleigenen** Top-10.
-- Speichert genau einmal in `enter()` via `HighscoreStore.add(game_id, score, level)`.
-- 6 s oder Start-Button → `GAME_SELECT` (Selection bleibt auf dem gerade gespielten Game).
+- Overlay: Spielname, `GAME OVER`, Score.
+- Top-10-Tafel des gespielten Game bleibt sichtbar.
+- Qualifikation (`score > 0` und (Liste < 10 oder `score >=` 10. Platz)): **kein** Schreiben in `enter()`. Wechsel nach 1.2 s oder sofort bei Start/Action → `NAME_ENTRY`. Ohne Qualifikation kein Name, kein Write.
+- Nicht qualifiziert: 6 s oder Start/Action → `GAME_SELECT` (featured unverändert). Operator-Kombo in diesem Fall erlaubt (featured wechselt, die Runde wurde nicht gespeichert).
+- Qualifiziert: Operator-Kombo **gesperrt**, bis `NAME_ENTRY` abgeschlossen oder per Timeout verworfen ist.
+
+#### 2.2.5 NAME_ENTRY
+
+Pflicht, sobald die Runde die Top-10 qualifiziert. **Kein Überspringen**, kein leerer Name, kein automatisches `AAA`.
+
+- Alphabet-Tafel: `A–Z`, `0–9`, `−` (Bindestrich), `←` (löschen), `END`.
+- Stick: Cursor in der Tafel (kein Diagonal-Pick; `dx`/`dy` disjunkt).
+- `command.action` (Edge): Buchstabe anhängen (max. `NAME_MAX_LEN = 8`); `←` löscht ein Zeichen; `END` reicht `command.start` gleich.
+- `command.start`: absenden, **nur wenn** `len(name) >= NAME_MIN_LEN = 3`. Sonst ignorieren, Hinweis `3 ZEICHEN MIN.` 1 s.
+- Name wird intern uppercased, nur der erlaubte Zeichensatz. Leading/Trailing-Spaces stripped; interne Spaces verboten (Alphabet enthält kein Space).
+- Nach gültigem Absenden: genau einmal `HighscoreStore.add(featured, name, score, level)` → `GAME_SELECT`. Die Top-10 ist dort sofort aktualisiert.
+- Inaktivität in `NAME_ENTRY`: `NAME_ENTRY_SECONDS = 20`. Timeout **verwirft** den Score (kein anonymer Write) und geht zu `GAME_SELECT`. Jeder Input resetet den Timer.
+- Operator-Spielwechsel in `NAME_ENTRY` **gesperrt** (Score gehört zum gerade gespielten Titel).
+
+Default-Anzeige: leerer Name, Cursor auf `A`. Die Top-10 zeigt den neuen Rang als blinkende Leerzeile (`--  ........  score`) bis zum Absenden.
 
 ### 2.3 Messe-Kiosk-Features
 
@@ -311,11 +349,15 @@ Carousel-Reihenfolge fest: Pac-Man, Donkey Kong, Snake, Bubble Shot, Frogger.
 ```
 INACTIVITY_SECONDS = 30
 ATTRACT_IDLE_SECONDS = 12
-ATTRACT_ROTATE_SECONDS = 8
+NAME_ENTRY_SECONDS = 20
 ```
 
-- Aktivität = Richtung, Action, Start. Analog unter `AXIS_DEADZONE = 0.45` zählt nicht.
-- Timeout in `PLAYING`/`GAME_OVER` → `GAME_SELECT`. Score aus `PLAYING` wird **nicht** gespeichert; aus `GAME_OVER` bereits gespeichert.
+`ATTRACT_ROTATE_SECONDS` ist **entfernt** (Attract bleibt auf dem featured Game).
+
+- Aktivität = Richtung, Action, Start. Analog unter `AXIS_DEADZONE = 0.45` zählt nicht. Operator-Kombo zählt als Aktivität.
+- Timeout in `PLAYING`/`GAME_OVER` → `GAME_SELECT`. Score aus `PLAYING` wird **nicht** gespeichert. Score aus `GAME_OVER` ist zu diesem Zeitpunkt noch nicht geschrieben (Write erst nach `NAME_ENTRY`).
+- Der 30-s-Global-Timer gilt **nicht** in `NAME_ENTRY`.
+- Timeout in `NAME_ENTRY` (20 s): Score verwerfen, `GAME_SELECT`.
 
 #### 2.3.2 Highscore-Speicher
 
@@ -325,7 +367,7 @@ Datei: `data/highscores.json`
 {
   "updated_at": "ISO-8601",
   "games": {
-    "PACMAN": [{"score": 12340, "level": 2, "ts": "ISO-8601"}],
+    "PACMAN": [{"name": "ROL", "score": 12340, "level": 2, "ts": "ISO-8601"}],
     "DONKEY_KONG": [],
     "SNAKE": [],
     "BUBBLE_SHOT": [],
@@ -334,11 +376,29 @@ Datei: `data/highscores.json`
 }
 ```
 
+`HighscoreStore.add(game_id, name, score, level) -> int` gibt den 1-basierten Rang zurück (0 = nicht aufgenommen).
+
 - Pro `GameId` maximal 10 Einträge, sortiert `score` desc, dann `ts` desc.
+- `name` ist Pflicht: 3–8 Zeichen aus `[A-Z0-9-]`. Fehlt oder ungültig → **kein Write**.
 - Atomar: `highscores.json.tmp` + `os.replace`.
 - Corrupt → leere Listen für alle fünf Keys, Rebuild beim Write.
 - Altes Schema ohne `games`-Map (nur `entries`) einmalig nach `PACMAN` migrieren.
+- Legacy-Einträge ohne `name` → `name = "---"` (einmalig, bleiben stehen, zählen in die Top-10).
+- Score `0` wird nie geschrieben.
 - `data/` wird beim ersten Write erzeugt.
+
+#### 2.3.2b Cabinet-Speicher (featured Game)
+
+Datei: `data/cabinet.json`
+
+```json
+{ "featured_game": "PACMAN", "updated_at": "ISO-8601" }
+```
+
+- `CabinetStore.load() -> GameId`, `CabinetStore.save(game_id)`.
+- Ungültiger/fehlender Key → `PACMAN`.
+- Atomar analog Highscore.
+- `Shift+R` löscht Highscores, **nicht** das featured Game.
 
 #### 2.3.3 Kiosk-Display
 
@@ -349,10 +409,56 @@ Datei: `data/highscores.json`
 
 #### 2.3.4 Operator-Hotkeys
 
+Kein HUD-Hinweis auf irgendeine dieser Kombinationen.
+
 - `Q` + `Left-Shift`: Beenden.
 - `F11`: Fullscreen toggle (Dev).
-- `R` + `Left-Shift`: Highscores **aller** Spiele löschen.
-- `1`…`5`: im Select-Screen Direktwahl (Dev): Pac-Man … Frogger.
+- `R` + `Left-Shift`: Highscores **aller** Spiele löschen (featured Game bleibt).
+- `1`…`5`: stille Direktwahl des featured Game (Dev/Operator), erlaubt in `GAME_SELECT`, `ATTRACT_MODE` und in `GAME_OVER` **ohne** Qualifikation — nicht in `PLAYING` / `NAME_ENTRY` / qualifiziertem `GAME_OVER`.
+
+#### 2.3.5 Operator-Spielwechsel (verbindlich)
+
+Öffentliches Links/Rechts **darf das Spiel nicht wechseln**. Nur wer die Kombination kennt, schaltet den Kabinett-Titel um.
+
+**Modifier (gehalten):**
+
+| Quelle | Modifier |
+|---|---|
+| Tastatur | `K_LSHIFT` |
+| 8BitDo / Gamepad | Button **6 oder 8** (Select) **oder** Button **7 oder 9** (Start), gehalten. **Nicht** Button 0/1 (Action). |
+
+**Schaltgeste:** Modifier gehalten + `Left`/`Right` Edge → `featured` ± 1, Wrap Pac-Man ↔ Frogger. Sofort `CabinetStore.save`. Titel + Top-10 wechseln in derselben Frame-Logik.
+
+Zusätzlich Dev: Tasten `1`…`5` (siehe 2.3.4).
+
+Regeln:
+
+- Wirkt in `GAME_SELECT`, `ATTRACT_MODE` und in `GAME_OVER` **ohne** anstehende Namenseingabe.
+- Wirkt **nicht** in `PLAYING`, **nicht** in `NAME_ENTRY` und **nicht** in qualifiziertem `GAME_OVER`.
+- Action (Button 0/1 / Space) ist **kein** Modifier — sonst startet jeder Messebesucher unbeabsichtigt den Wechsel.
+- Kurzes Start-Tap ohne Richtung bleibt `start` (Spiel beginnen / Overlay schließen).
+- Start/Select **gehalten** ohne Richtung: kein Spielstart, kein Switch (entprellt die Kombo).
+- Nach Switch: 200 ms Cyan-Rahmenblitz, **kein** Text `OPERATOR` / `GEHEIM`. Log auf stdout: `[operator] featured=SNAKE`.
+- Attract wird beim Switch abgebrochen.
+
+#### 2.3.6 Top-10-Tafel (sichtbar, wenn nicht gespielt wird)
+
+Komponente `draw_highscore_table(surf, game_id, highlight_rank=None)`.
+
+Pflicht in `GAME_SELECT`, `ATTRACT_MODE`, `GAME_OVER`, `NAME_ENTRY`. In `PLAYING` nicht zeichnen.
+
+```
+HI-SCORE  PAC-MAN
+01  ROL      012340
+02  MIA      009100
+...
+10  ---      000000
+```
+
+- Monospace, Rang 2-stellig, Name 8 Zeichen links, Score 6-stellig zero-padded.
+- Lesbar ab 1,5 m: Zeilenhöhe ≥ 28 px, Farbe Warmweiß, Rang-1 Bernstein.
+- `highlight_rank` (nach neuer Qualifikation / während NAME_ENTRY): diese Zeile blinkt cyan.
+- Immer genau 10 Zeilen, auch wenn weniger Einträge existieren.
 
 ### 2.4 Gamepad / Keyboard Event-Loop
 
@@ -364,12 +470,16 @@ class Command:
     start: bool
     action: bool         # Edge: A / Space — Sprung, Schuss, Bestätigen
     action_held: bool    # Level: gehalten (für optionales Charging; Default ungenutzt)
+    operator_held: bool  # Shift / Select / Start (nicht Action) gehalten
+    operator_switch: int # -1, 0, +1 — nur wenn operator_held und Left/Right-Edge
     any_action: bool
     activity: bool
     quit_combo: bool
 ```
 
 `dx/dy` disjunkt, keine Diagonalen. Priorität: D-Pad → Analog (größere Achse) → Tastatur → (0,0).
+
+Wenn `operator_switch != 0`, setzt die Shell `dx = 0` für die öffentliche Semantik (kein gleichzeitiges Navigieren in NAME_ENTRY). `start` ist in diesem Frame `False` (gehaltenes Start löst kein Spielstart aus).
 
 | Aktion | Keyboard | Gamepad |
 |---|---|---|
@@ -379,21 +489,25 @@ class Command:
 | Rechts | `K_RIGHT`, `K_d` | HAT x=+1 oder Axis 0 > +DEADZONE |
 | Action / Sprung / Schuss | `K_SPACE`, `K_LCTRL` | Button 0 (A), Button 1 (B) |
 | Start / Bestätigen | `K_RETURN` | Button 7 / 9 (Start) **oder** Action, wenn der State Action als Start akzeptiert |
+| Operator-Modifier | `K_LSHIFT` | Button 6 / 8 (Select), 7 / 9 (Start) gehalten |
+| Operator-Switch | Shift + Links/Rechts | Select/Start gehalten + Links/Rechts |
 | Aktivität | jede der oben | jede der oben |
 
 - Joystick-Hot-Plug ohne Crash.
 - `HAT_Y_INVERT = True` als Pi-Default.
-- `START_BUTTONS = {0, 1, 7, 9}` für Start in SELECT/GAME_OVER.
+- `START_BUTTONS = {0, 1, 7, 9}` für **kurzes** Start in SELECT/GAME_OVER/NAME_ENTRY. Gehaltenes 7/9 mit Richtung ist Operator, nicht Start.
+- `OPERATOR_BUTTONS = {6, 7, 8, 9}`. Schnittmenge mit Start ist Absicht: derselbe Start-Button am 8BitDo DIY Kit dient als Modifier, sobald er gehalten wird.
 - `action` ist **Edge** (down in diesem Frame), sonst feuert Bubble Shot Dauerfeuer.
 
 #### 2.4.1 Command-Semantik in der Shell
 
-| State | Richtung | Action / Start |
-|---|---|---|
-| GAME_SELECT | wechselt Slot | → PLAYING |
-| ATTRACT_MODE | → GAME_SELECT | → GAME_SELECT |
-| PLAYING | an `GameMode` | an `GameMode` (`start` ignorieren) |
-| GAME_OVER | activity hält Timer | → GAME_SELECT |
+| State | Richtung (ohne Operator) | Action / Start | Operator-Switch |
+|---|---|---|---|
+| GAME_SELECT | ignoriert | → PLAYING | featured ± 1, bleibt SELECT |
+| ATTRACT_MODE | → GAME_SELECT | → GAME_SELECT | featured ± 1, → SELECT |
+| PLAYING | an `GameMode` | an `GameMode` (`start` ignorieren) | ignoriert |
+| GAME_OVER | activity hält Timer | → NAME_ENTRY (qualifiziert) oder SELECT | featured ± 1 nur wenn **nicht** qualifiziert |
+| NAME_ENTRY | Cursor auf Alphabet | Buchstabe / END bzw. Absenden | ignoriert |
 
 #### 2.4.2 Command-Semantik in den Spielen
 
@@ -668,18 +782,18 @@ Von unten nach oben:
 
 Reihenfolge **zwingend** (jedes Game nach Shell spielbar committen, nicht fünf halbfertige):
 
-1. Shared Shell: Display, Input, LogoAsset, Highscore, GAME_SELECT, ATTRACT-Gerüst, GAME_OVER.
-2. `PacmanMode` vollständig (Abnahme §5.A).
-3. `SnakeMode` (schnellster zweiter Titel).
+1. Shared Shell: Display, Input, LogoAsset, Highscore inkl. Name, CabinetStore, GAME_SELECT-Idle + Top-10-Tafel, Operator-Switch, ATTRACT-Gerüst (nur featured), GAME_OVER, NAME_ENTRY.
+2. `PacmanMode` vollständig (Abnahme §5.A). Featured-Default = PACMAN.
+3. `SnakeMode` (schnellster zweiter Titel). Operator kann darauf schalten, sobald spielbar.
 4. `FroggerMode`.
 5. `BubbleShotMode`.
 6. `DonkeyKongMode`.
-7. Attract rotiert durch alle implementierten Games; fehlende Modes dürfen noch nicht im Carousel stehen **oder** sitzen als `Coming Soon` — **verboten**. Carousel zeigt nur fertige Games. Zielstand: alle fünf fertig.
+7. Attract spielt **nur** das featured Game. Ein unfertiger Titel darf **nicht** per Operator erreichbar sein. Zielstand: alle fünf fertig und per Kombo wählbar. Kein `Coming Soon`, kein öffentliches Carousel.
 
 Weitere Regeln:
 
 1. `requirements.txt` + `setup_pi5.sh` für Pi 5 / Bookworm.
-2. README: `python3 main.py`, `CHAOS_WINDOWED=1`, kurze Spielübersicht der fünf Titel.
+2. README: `python3 main.py`, `CHAOS_WINDOWED=1`, kurze Spielübersicht, **ohne** die Operator-Kombo preiszugeben (die steht nur hier im Prompt).
 3. Ohne `logo.svg` starten alle fünf mit Fallback.
 4. Mit `logo.svg` ist das Logo in jedem Titel der Avatar (siehe 1.4).
 5. Tastatur allein reicht für alle Spiele inkl. Action (Space).
@@ -700,13 +814,18 @@ python3 main.py
 ### 5.0 Shared Shell
 
 - [ ] Start auf Pi 5 und Desktop (windowed) ohne Crash, ohne SVG, ohne Gamepad.
-- [ ] Carousel zeigt genau fünf Titel, Wrap, Hi-Score wechselt pro Slot.
-- [ ] Start lädt das gewählte Spiel; Game-Over kehrt zur Auswahl auf demselben Slot zurück.
-- [ ] 12 s Idle → Attract; Attract rotiert Titel; Input → SELECT.
+- [ ] Idle zeigt **ein** featured Game (Default PACMAN) plus dessen vollständige Top-10. Kein Carousel, keine Nachbar-Titel, keine Wähl-Pfeile.
+- [ ] Öffentliches Links/Rechts wechselt das Spiel **nicht**. Shift+Links/Rechts bzw. Start/Select gehalten + Links/Rechts wechselt featured (Wrap), persistiert in `cabinet.json`, loggt `[operator]`.
+- [ ] Tasten `1`…`5` schalten featured still; unfertige Titel sind nicht erreichbar.
+- [ ] Start/Action lädt das featured Spiel; Game-Over kehrt zum Idle **desselben** Titels zurück (außer Operator hat danach umgeschaltet).
+- [ ] Qualifizierter Score öffnet NAME_ENTRY; Absenden erst ab 3 Zeichen; Write nur mit Name. Timeout 20 s verwirft den Score.
+- [ ] Unqualifizierter Score (0 oder unter Platz 10 bei voller Liste): kein NAME_ENTRY, kein Write.
+- [ ] Top-10-Tafel mit Name+Score ist in SELECT, ATTRACT, GAME_OVER, NAME_ENTRY sichtbar; in PLAYING nicht.
+- [ ] 12 s Idle → Attract **desselben** Titels (keine Titelrotation); Input → SELECT.
 - [ ] 30 s Idle in PLAYING → SELECT, kein Highscore-Write.
-- [ ] Highscores getrennt pro Game, überleben Neustart; Legacy-`entries` → PACMAN.
+- [ ] Highscores getrennt pro Game, inkl. Name, überleben Neustart; Legacy-`entries` → PACMAN mit `name = "---"`.
 - [ ] Logo-Pipeline cairosvg → pygame → Fallback, Logs auf stdout.
-- [ ] 8BitDo D-Pad, Analog, A/Start und Keyboard parallel; Action ist Edge.
+- [ ] 8BitDo D-Pad, Analog, A/Start/Select und Keyboard parallel; Action ist Edge; Start gehalten + Richtung = Operator, nicht Spielstart.
 - [ ] Fullscreen-Kiosk, Cursor aus, Shift+Q beendet.
 - [ ] ≥ 50 FPS in jedem aktiven Spiel.
 
@@ -735,12 +854,14 @@ python3 main.py
 ## 6. Self-Check vor dem Commit der Implementierung
 
 1. Existieren `GameMode` und fünf Mode-Klassen, auch wenn noch in `main.py` gebündelt?
-2. Eine Shared-Quelle für Display/Input/Logo/Highscore?
+2. Eine Shared-Quelle für Display/Input/Logo/Highscore/Cabinet?
 3. Wird `logo.svg` niemals pro Frame gerastert — auch nicht für Bubble-Winkel (Cache!)?
 4. Sind Diagonalen in Pac-Man/Snake/Frogger unmöglich? (DK: in der Luft begrenztes Strafen erlaubt, kein 8-Wege-Run.)
-5. Kann das Kabinett 2 Minuten ohne Input im Select/Attract-Zyklus allein laufen?
-6. Ist `data/highscores.json` gitignored?
-7. Zeigt SELECT wirklich alle fünf **spielbaren** Titel — keinen Platzhalter-Slot?
+5. Kann das Kabinett 2 Minuten ohne Input im Select/Attract-Zyklus **desselben** featured Game allein laufen?
+6. Sind `data/highscores.json` und `data/cabinet.json` gitignored?
+7. Gibt es **kein** öffentliches Carousel und keinen `Coming Soon`-Slot? Ist Spielwechsel ausschließlich die Operator-Kombo?
 8. Crash in einem Mode fängt die Shell und kehrt zu SELECT zurück?
+9. Wird kein Highscore ohne gültigen Namen (3–8, `[A-Z0-9-]`) geschrieben?
+10. Ist die Operator-Kombo nirgends im HUD oder in der README erklärt?
 
 Ende des Master-Prompts. Dieses Dokument ist die einzige Wahrheitsquelle für die Code-Generierung.
