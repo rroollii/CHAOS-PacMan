@@ -1,13 +1,27 @@
-# CHAOS PacMan — Master-Prompt / System-Instruction Set
+# CHAOS Arcade — Master-Prompt / System-Instruction Set
 
 **Dokumenttyp:** Pflichtenheft + Self-Instruction Set für Code-Generierung  
+**Produktname (UI):** `CHAOS ARCADE`  
+**Repo-/Ordnername:** `CHAOS_PacMan` (unverändert; kein Rename-Zwang)  
 **Zielplattform:** Raspberry Pi 5 (64-bit Raspberry Pi OS)  
 **Stack:** Python 3.11+ / Pygame 2  
 **Eingabe:** 8BitDo DIY Kit (Bluetooth Arcade-Stick) + Tastatur-Pfeiltasten  
-**Spieler-Asset:** `assets/logo.svg` (Firmenlogo, Vektor)  
+**Spieler-Asset:** `assets/logo.svg` (Firmenlogo, Vektor) — **in jedem Spiel** die Spielfigur  
 **Betriebsart:** Unbeaufsichtigtes Messe-Kiosk am digitalen Pult  
 
-Dieses Dokument ist verbindlich. Jede nachfolgende Implementierung (`main.py` und Hilfsmodule) muss sich **wortgetreu** an diese Vorgaben halten. Abweichungen sind nur zulässig, wenn sie einen Laufzeitfehler auf dem Raspberry Pi 5 verhindern — und müssen dann im Code kommentiert werden.
+**Spielkatalog (verbindlich, genau diese fünf, in dieser Reihenfolge):**
+
+| `GameId` | UI-Titel | Genre-Vorbild | Kernschleife (Messe, 30–90 s) |
+|---|---|---|---|
+| `PACMAN` | PAC-MAN | Pac-Man | Labyrinth, Dots, 4 Geister |
+| `DONKEY_KONG` | DONKEY KONG | Donkey Kong | Plattformen, Leitern, Fässer, Sprung |
+| `SNAKE` | SNAKE | Snake | Wachsen, nicht selbst treffen |
+| `BUBBLE_SHOT` | BUBBLE SHOT | Puzzle Bobble / Bubble Shooter | Zielen, schießen, 3er-Match |
+| `FROGGER` | FROGGER | Frogger | Straßen/Fluss queren, 5 Ziele |
+
+Dieses Dokument ist verbindlich. CHAOS Arcade ist **kein** reiner Pac-Man-Klon. Pac-Man ist das **erste** Spiel im Kabinett, nicht das einzige. Jede nachfolgende Implementierung muss sich **wortgetreu** an diese Vorgaben halten. Abweichungen sind nur zulässig, wenn sie einen Laufzeitfehler auf dem Raspberry Pi 5 verhindern — und müssen dann im Code kommentiert werden.
+
+Rechtlicher Rahmen: Es werden **keine** originalen ROM-Assets, Sprites, Melodien oder Markenzeichen Dritter eingebettet. Mechanik und Feeling dürfen anklingen; visuelle Identität ist ausschließlich CHAOS (Logo + Neon-Palette).
 
 ---
 
@@ -15,7 +29,13 @@ Dieses Dokument ist verbindlich. Jede nachfolgende Implementierung (`main.py` un
 
 ### 0.1 Betriebsziel
 
-CHAOS PacMan ist ein **30–90-Sekunden-Mitmach-Spiel** im Pac-Man-Stil. Ein Messebesucher greift zum Arcade-Stick, spielt eine Runde, sieht den Score, und das Gerät kehrt selbstständig in den Lockbildschirm zurück. Es gibt **kein** Menü mit Dateipfaden, **kein** Beenden über UI, **kein** Vollbild-Verlassen außer über ein verstecktes Operator-Hotkey (siehe 2.5).
+CHAOS Arcade ist ein **Multi-Game-Mitmach-Kabinett**. Ein Messebesucher greift zum Arcade-Stick, wählt in ≤ 5 Sekunden ein Spiel, spielt eine kurze Runde, sieht den Score, und das Gerät kehrt selbstständig zur Spielauswahl zurück.
+
+- Es gibt **kein** Dateimenü, **kein** OS-UI, **kein** Beenden über sichtbare Buttons.
+- Vollbild-Verlassen nur über verstecktes Operator-Hotkey (siehe 2.5).
+- Jedes der fünf Spiele muss **allein mit Stick + einem Action-Button** bedienbar sein.
+- Typische Runde: **30–90 Sekunden**. Kein Spiel darf eine Einarbeitungszeit > 3 Sekunden brauchen.
+- Das Firmenlogo ist in **allen** Spielen der Avatar (Mund/Kopf, Kletterer, Schlangenkopf, Kanone/Kugel, Springer).
 
 ### 0.2 Hardware-Annahmen
 
@@ -32,55 +52,82 @@ CHAOS PacMan ist ein **30–90-Sekunden-Mitmach-Spiel** im Pac-Man-Stil. Ein Mes
 
 - Feste Logik-Tickrate: **60 Hz** (`CLOCK.tick(60)`).
 - Kein per-frame SVG-Re-Rendering. Vektoren werden **einmal** beim Start (und bei Fenster-Resize) in Surfaces gerastert.
-- Maximal **eine** vollständige Maze-Redraw-Komposition pro Frame; Dots/Pellets als Dirty-Rects oder Layer-Cache.
+- Pro Frame maximal die aktive Spielszene plus HUD. Inaktive Games werden nicht simuliert (außer Attract-Demo des aktuellen Slots).
 - Keine Blocking-I/O im Game-Loop. Highscore-Schreiben erfolgt atomar und kurz.
-- Ziel: stabil ≥ 50 FPS auf Pi 5 bei 1280×720.
+- Ziel: stabil ≥ 50 FPS auf Pi 5 bei 1280×720, **in jedem** der fünf Spiele.
 
 ### 0.4 Code-Qualität
 
-- Eine klare Modulstruktur (siehe 0.5). `main.py` ist der Einstieg, nicht der gesamte Monolith, **außer** die erste lauffähige Version darf bewusst in `main.py` gebündelt sein, solange die Sektionen durch Kommentarbanner getrennt und die Klassen identisch benannt sind.
+- Klare Modulstruktur (siehe 0.5). `main.py` ist der Einstieg.
+- Die erste lauffähige Version darf Module bündeln, **muss** aber die genannten Klassen-/Funktionsnamen verwenden.
 - Typ-Hints an allen öffentlichen Funktionen und Klassenmethoden.
-- Keine Magic Numbers ohne benannte Konstanten im Block `CONFIG`.
-- Keine Netzwerkzugriffe.
-- Keine Telemetrie.
+- Keine Magic Numbers ohne benannte Konstanten (`config.py` + optional `games/<id>/constants.py`).
+- Keine Netzwerkzugriffe, keine Telemetrie.
 - UTF-8, Linux-Zeilenenden.
 - Lauffähig **ohne** `logo.svg` (Fallback-Renderer ist Pflicht).
+- Jedes Spiel implementiert dasselbe `GameMode`-Protokoll. Keine Sonderwege für Pac-Man.
 
 ### 0.5 Verbindliche Dateistruktur
 
 ```
 CHAOS_PacMan/
-├── main.py                 # Einstieg + Game-Loop
-├── config.py               # Alle Konstanten, Farben, Timing, Grid
+├── main.py                 # Einstieg + Shell-Loop
+├── config.py               # Shared Konstanten, Farben, Timing, Display
 ├── input_map.py            # Keyboard + Gamepad-Mapping
 ├── assets_loader.py        # SVG-Pipeline + Fallback-Logo
-├── maze.py                 # Grid, Kollision, Dots, Tunnel
-├── player.py               # Spieler-Entität
-├── ghosts.py               # Geister + KI
-├── states.py               # State-Machine
-├── highscore.py            # JSON Persistenz
-├── attract.py              # Attract-Mode Demo
+├── states.py               # Shell-States: SELECT, ATTRACT, PLAYING, GAME_OVER
+├── highscore.py            # JSON Persistenz, getrennt pro GameId
+├── game_mode.py            # ABC GameMode
+├── games/
+│   ├── pacman/
+│   │   ├── maze.py
+│   │   ├── player.py
+│   │   ├── ghosts.py
+│   │   └── mode.py         # PacmanMode(GameMode)
+│   ├── donkey_kong/
+│   │   ├── stage.py
+│   │   ├── barrels.py
+│   │   └── mode.py
+│   ├── snake/
+│   │   └── mode.py
+│   ├── bubble_shot/
+│   │   ├── grid.py
+│   │   └── mode.py
+│   └── frogger/
+│       ├── lanes.py
+│       └── mode.py
+├── attract.py              # Demo-Steuerung, rotiert durch alle Games
 ├── assets/
 │   └── logo.svg            # Firmenlogo (kann fehlen)
 ├── data/
 │   └── highscores.json     # wird zur Laufzeit erzeugt
 ├── requirements.txt
-├── setup_pi5.sh            # Installationsskript für Raspberry Pi 5
-├── MASTER_PROMPT.md        # dieses Dokument
+├── setup_pi5.sh
+├── MASTER_PROMPT.md
 └── README.md
 ```
 
-Die **erste vollständige Auslieferung** darf alle Module in `main.py` vereinen, **muss** aber dieselben Klassen-/Funktionsnamen verwenden, damit ein späterer Split ohne API-Bruch möglich ist.
+Die erste Auslieferung darf alles in `main.py` vereinen, **muss** aber `GameId`, `GameMode` und die fünf Mode-Klassen (`PacmanMode`, `DonkeyKongMode`, `SnakeMode`, `BubbleShotMode`, `FroggerMode`) namentlich enthalten.
 
 ### 0.6 Visuelle Identität (Arcade / CHAOS)
 
+Shared:
+
 - Hintergrund: tiefes Anthrazit `#0B0D10`.
-- Wände: neon-cyan `#2DE2E6` mit dunklem Innenfill `#12161C`.
-- Dots: warmes Weiß `#F4F1EA`.
-- Power-Pellets: pulsierendes Bernstein `#FFB703`.
-- HUD: monospace, hoher Kontrast, große Zahlen (Messe-Lesbarkeit ab 1,5 m).
-- Geisterfarben (fest): Blinky `#FF3B3B`, Pinky `#FF7AD9`, Inky `#3BD1FF`, Clyde `#FF9F1C`.
-- Kein Comic-Pac-Man-Sprite. Der Spieler **ist** das Firmenlogo.
+- HUD: monospace, hoher Kontrast, große Zahlen (Lesbarkeit ab 1,5 m).
+- Akzent: neon-cyan `#2DE2E6`, Warmweiß `#F4F1EA`, Bernstein `#FFB703`.
+- Gefahr: `#FF3B3B`. Support: `#FF7AD9`, `#3BD1FF`, `#FF9F1C`.
+- Kein Comic-Pac-Man-, kein Nintendo-, kein Konami-Sprite. Der Spieler **ist** das Firmenlogo.
+
+Akzente pro Spiel (nur Level-Geometrie, nicht das Logo):
+
+| Game | Primärakzent | Level-Look |
+|---|---|---|
+| PACMAN | `#2DE2E6` | Neon-Maze, dunkler Innenfill `#12161C` |
+| DONKEY_KONG | `#FF9F1C` | Nieten-Träger, Leitern cyan, Fässer rot |
+| SNAKE | `#2DE2E6` | Dunkelgrid, Food bernstein |
+| BUBBLE_SHOT | `#3BD1FF` | Kugelfarben aus der CHAOS-Palette |
+| FROGGER | `#3BD1FF` / `#FF3B3B` | Straße dunkel, Wasser cyan-dunkel, Ziele bernstein |
 
 ---
 
@@ -89,13 +136,23 @@ Die **erste vollständige Auslieferung** darf alle Module in `main.py` vereinen,
 ### 1.1 Quelle und Verträge
 
 - Primärpfad: `assets/logo.svg`.
-- Das SVG gilt als **quadratisch normiert**. Liegt ein nicht-quadratisches ViewBox vor, wird der Inhalt **proportional** in ein Quadrat gefittet und zentriert (Letterbox transparent, niemals gestreckt).
-- Zielgröße der Spieler-Surface: `PLAYER_SIZE = TILE_SIZE - 4` Pixel (2 px Luft pro Seite im Tile).
-- `TILE_SIZE = 32` bei internem Raster. Maze-Zellen sind 32×32 CSS-Pixel der internen Oberfläche.
+- Das SVG gilt als **quadratisch normiert**. Nicht-quadratische ViewBox: proportional fitten, zentrieren, niemals strecken.
+- Mehrere Rastergrößen, **einmal** beim Boot cachen:
+
+| Cache-Key | Größe | Verwendung |
+|---|---|---|
+| `logo_hero` | 160 | SELECT / Titel |
+| `logo_tile` | `TILE_SIZE - 4` (Default 28) | Pac-Man, Snake-Kopf, Frogger |
+| `logo_dk` | 36 | Donkey-Kong-Kletterer |
+| `logo_cannon` | 48 | Bubble-Shot-Kanone |
+| `logo_bubble` | 28 | Bubble-Shot-Kugel (getintet) |
+| `logo_snake_body` | 24 | Snake-Körper (getintet, 70 % Alpha) |
+
+`TILE_SIZE = 32` bleibt die Shared-Grid-Basis. Einzelne Games dürfen eigene Zellengrößen nutzen, beziehen sie aber aus `config.py`.
 
 ### 1.2 Ladestrategie (verbindliche Reihenfolge)
 
-Die Loader-Klasse heißt `LogoAsset`. Methode: `LogoAsset.load(path: Path, size: int) -> pygame.Surface`.
+Klasse `LogoAsset`. Methode: `LogoAsset.load(path: Path, size: int) -> pygame.Surface`.
 
 **Stufe A — cairosvg (bevorzugt auf Pi 5):**
 
@@ -105,172 +162,147 @@ SVG-Bytes → cairosvg.svg2png(bytestring=..., output_width=size*2, output_heigh
          → smoothscale auf (size, size)
 ```
 
-Begründung: 2×-Supersampling reduziert Treppeneffekte an Logo-Kanten. `output_width/height` erzwingt quadratisches Rastern unabhängig von ViewBox-Seitenverhältnis; cairosvg letterboxt intern, sofern `svg2png` mit identischen Maßen aufgerufen wird. Zusätzlich wird das PNG nach dem Load auf ein echtes Quadrat zentriert, falls cairosvg das Seitenverhältnis erhält:
+Zusätzlich quadratisch zentrieren:
 
 1. Lade Surface.
-2. Berechne `scale = size / max(w, h)`.
-3. Skaliere proportional.
-4. Blitte auf eine transparente `size×size`-Surface, zentriert.
+2. `scale = size / max(w, h)`.
+3. Proportional skalieren.
+4. Auf transparente `size×size`-Surface zentriert blitten.
 
-**Stufe B — pygame / SDL_image (Fallback, wenn cairosvg fehlt oder scheitert):**
+**Stufe B — pygame / SDL_image**, bei Exception weiter zu Stufe C.
 
-- `pygame.image.load(path)` nur wenn die lokale Pygame-Build SVG kann (unsicher auf Pi).
-- Bei Exception: weiter zu Stufe C.
+**Stufe C — geometrischer Fallback** `render_fallback_logo(size)`:
 
-**Stufe C — geometrischer Fallback (immer verfügbar):**
+- Kreis-Körper, Radius `size * 0.46`, Fill `#F4F1EA`, Outline `#2DE2E6`.
+- Polygon-Fächer (36 Segmente), Mundwinkel ±28° offen.
+- Zwei Orbit-Dreiecke (10 Uhr / 2 Uhr) in Cyan.
+- Ein Auge oberhalb der Mundmitte.
 
-Wenn `assets/logo.svg` fehlt **oder** Stufe A und B scheitern, zeichnet `render_fallback_logo(size: int) -> pygame.Surface` ein stilisierter CHAOS-Marken-Avatar rein mit Pygame:
+`LogoAsset.load` wirft **keine** Exception nach außen.
 
-- Kreis-Körper, Radius `size * 0.46`, Fill `#F4F1EA`, 2 px Outline `#2DE2E6`.
-- Pac-Man-ähnliche Mundaussparung **nicht** als festes Pac-Man-Gelb, sondern als Keil (Polygon-Cut via zweites Circle in Hintergrundfarbe ist verboten, weil es nicht transparent wäre). Stattdessen: Zeichne den Körper als Polygon-Fächer (36 Segmente) und lasse einen Mundwinkel von ±28° offen.
-- Zwei kleine „Orbit“-Polygone (Dreiecke) bei 10 Uhr und 2 Uhr in Cyan, als CHAOS-Signet-Ersatz.
-- Ein Auge: Kreis, dunkel, sitzt oberhalb der Mundmitte.
+### 1.3 Richtungs-Transformation
 
-Der Fallback muss auf den ersten Blick als spielbarer Arcade-Kopf lesbar sein, auch ohne Firmenlogo.
+Einmal vier Richtungs-Surfaces pro Größe cachen. Basis: Logo schaut nach **rechts**. Korrektur nur über `LOGO_BASE_FACING`.
 
-### 1.3 Richtungs-Transformation (keine per-frame Vektorrotation)
-
-Das Logo wird **einmal** in vier Richtungs-Surfaces gecacht.
-
-Kanonische Annahme: Das Quelllogo „schaut“ nach **rechts** (positive X). Ist das falsch, korrigiert `LOGO_BASE_FACING = "right"` in `config.py` die Basis. Nur dieser eine Parameter darf gedreht werden, nicht die Gameplay-Logik.
-
-| Richtung | Transformation aus Basis-Surface (facing right) |
+| Richtung | Transformation |
 |---|---|
 | RIGHT | unverändert |
-| LEFT | `pygame.transform.flip(base, True, False)` |
-| UP | `pygame.transform.rotate(base, 90)` |
-| DOWN | `pygame.transform.rotate(base, -90)` |
+| LEFT | `flip(base, True, False)` Default (`LOGO_LEFT_MODE = "flip"`) |
+| UP | `rotate(base, 90)` + `_fit_square` |
+| DOWN | `rotate(base, -90)` + `_fit_square` |
 
-Regeln:
+- Niemals `rotozoom` pro Frame, niemals SVG neu parsen.
+- `tint_surface(surf, color)` einmalig für Snake-Körper, Frightened-Geister, Bubble-Farben.
 
-- `rotate` in Pygame ändert die Surface-Dimension. Nach jeder Rotation: zurück ins `size×size`-Quadrat zentrieren (`_fit_square(surf, size)`).
-- Niemals `rotozoom` pro Frame.
-- Niemals das SVG neu parsen, um eine Richtung zu erzeugen.
-- Spiegelung für LEFT ist der Default, weil viele Logos Buchstaben enthalten: eine 180°-Rotation würde Schrift auf den Kopf stellen. Flip erhält die Lesbarkeit besser als `rotate(180)`.
-- Wenn `LOGO_LEFT_MODE = "flip"` (Default) unlesbar ist (stark asymmetrisches Signet), darf auf `"rotate"` umgeschaltet werden — nur über Konstante, nicht hardcoded.
+### 1.4 Nutzungsregeln pro Spiel
 
-Zusätzlicher Cache: `FRIGHTENED` färbt eine Kopie des RIGHT-Frames per Pixel-Multiply in `#3B4CFF` (einmalig). Wird für den Spieler nicht genutzt, aber die gleiche Hilfsfunktion `tint_surface(surf, color)` wird für Geister-Flee-State verwendet.
+| Game | Logo-Nutzung |
+|---|---|
+| PACMAN | `logo_tile` + Facing-Cache, Cyan-Ring nur bei Bewegung |
+| DONKEY_KONG | `logo_dk`, Facing LEFT/RIGHT; UP nur auf Leiter (kein DOWN-Flip auf den Kopf — auf Leitern Facing unverändert oder leicht 0°) |
+| SNAKE | Kopf = `logo_tile[facing]`; Körper = `logo_snake_body` getintet `#2DE2E6` |
+| BUBBLE_SHOT | Kanone = `logo_cannon` rotiert auf **diskrete Winkelschritte** (gecachte 2°-Raster-Surfaces, 0…180° bzw. −80…+80); fliegende Kugel = `logo_bubble` getintet in Schussfarbe |
+| FROGGER | `logo_tile[facing]`; Idle schaut UP |
 
-### 1.4 Animations-Overlay (Logo bleibt erkennbar)
+Bubble-Shot-Rotation: Winkel-Cache beim Start in 2°-Schritten, **kein** per-frame `rotozoom` auf das SVG.
 
-- Das Logo selbst pulsiert **nicht** in der Größe (keine Scale-Animation — teuer und unruhig).
-- Mund-/Aktivitäts-Feedback: ein 2 px cyan Ring um das Tile, Alpha 80–160, sin-Pulse 2 Hz, nur im State `PLAYING` während Bewegung.
-- Bei Stillstand: Ring aus, Logo statisch.
-
-### 1.5 Fehler- und Logging-Vertrag
-
-`LogoAsset.load` wirft **keine** Exception nach außen. Rückgabe ist immer eine gültige Surface. Intern:
+### 1.5 Logging
 
 ```
 [assets] SVG loaded via cairosvg: assets/logo.svg
-[assets] SVG load failed (FileNotFoundError), using fallback geometry
-[assets] cairosvg missing, pygame load failed, using fallback geometry
+[assets] SVG load failed (...), using fallback geometry
 ```
 
-Logs gehen nach `stdout` (systemd/journal auf dem Pi).
+### 1.6 Abhängigkeiten
 
-### 1.6 Abhängigkeiten der Pipeline
-
-```
-cairosvg          # Python
-cairocffi
-cssselect2
-tinycss2
-defusedxml
-pillow
-```
-
-Systemseitig auf Raspberry Pi OS:
-
-```
-libcairo2
-libcairo2-dev
-libgdk-pixbuf-2.0-0
-libffi-dev
-libxml2
-libpango-1.0-0
-shared-mime-info
-```
-
-`cairosvg` ist **optional zur Laufzeit**. Fehlt es, greift Stufe B/C. `requirements.txt` listet `cairosvg` trotzdem, `setup_pi5.sh` installiert die Systemlibs.
+Python: `cairosvg`, `cairocffi`, `cssselect2`, `tinycss2`, `defusedxml`, `pillow`, `pygame`.  
+System (Pi): `libcairo2`, `libcairo2-dev`, `libgdk-pixbuf-2.0-0`, `libffi-dev`, `libxml2`, `libpango-1.0-0`, `shared-mime-info`.  
+`cairosvg` optional zur Laufzeit; Fallback ist Pflicht.
 
 ---
 
 ## 2. Game-Engine Architecture (Python / Pygame)
 
-### 2.1 Hauptloop — unveränderliches Gerüst
+### 2.1 Hauptloop — Shell, nicht Spiel
 
 ```
 init pygame, display, mixer (mixer failures ignorieren)
-load config, assets, maze, highscores
-state = START_SCREEN
+load config, LogoAsset-Caches, HighscoreStore
+registry = {
+    PACMAN: PacmanMode,
+    DONKEY_KONG: DonkeyKongMode,
+    SNAKE: SnakeMode,
+    BUBBLE_SHOT: BubbleShotMode,
+    FROGGER: FroggerMode,
+}
+state = GAME_SELECT          # nicht mehr direkt PACMAN
+selected = GameId.PACMAN
 last_input_ts = now
 while running:
     dt = clock.tick(60) / 1000.0
     events = pygame.event.get()
-    command = InputMap.poll(events, pygame.joystick)
+    command = InputMap.poll(events)
     if command.activity:
         last_input_ts = now
     state.on_command(command)
     state.update(dt)
     if now - last_input_ts >= INACTIVITY_SECONDS:
-        force_transition(START_SCREEN)  # und Attract vorbereiten
+        force_transition(GAME_SELECT)
     state.draw(screen)
     pygame.display.flip()
 ```
 
-`dt` in Sekunden, alle Bewegungen zeitbasiert (Pixel/Sekunde bzw. Tiles/Sekunde), niemals frame-count-basiert.
+Nur das **aktive** `GameMode` erhält `update`/`draw`. `dt` in Sekunden, zeitbasiert.
 
-### 2.2 State-Machine
-
-Klasse: `GameState` (ABC) mit `enter()`, `exit()`, `on_command(cmd)`, `update(dt)`, `draw(surf)`.
-
-Konkrete States, **exakte Enum-Namen**:
+### 2.2 State-Machine (Shell)
 
 ```
 class StateId(Enum):
-    START_SCREEN = "START_SCREEN"
+    GAME_SELECT = "GAME_SELECT"
     ATTRACT_MODE = "ATTRACT_MODE"
     PLAYING = "PLAYING"
     GAME_OVER = "GAME_OVER"
 ```
 
-`Game` hält `current: GameState` und `change_state(new_id: StateId)`. Jeder Wechsel ruft `exit()` dann `enter()` auf. Keine direkten Cross-Calls zwischen States.
+`START_SCREEN` entfällt. Der Titel sitzt in `GAME_SELECT`.
 
-#### 2.2.1 START_SCREEN
+`GameState`: `enter()`, `exit()`, `on_command(cmd)`, `update(dt)`, `draw(surf)`.  
+`Game.change_state(new_id)` ruft `exit()` dann `enter()`.
 
-- Vollflächiger Dark-Background.
-- Zentriert: das Firmenlogo in 160×160 (eigener Cache `logo_hero`, gleiche Pipeline, size=160).
-- Titelzeile: `CHAOS PACMAN` in 64 px, Tracking weit, Farbe `#F4F1EA`.
-- Unterzeile blinkend 1,2 Hz: `DRÜCKE START` (Gamepad Start/A/Any-Face oder Keyboard Enter/Space).
-- Rechts oder unten: `HI-SCORE` + bester lokaler Wert, immer 6-stellig zero-padded.
-- Kein Credit-System, kein Coin-Insert.
-- Übergang nach `PLAYING` bei `command.start` oder `command.any_action`.
-- Nach `ATTRACT_IDLE_SECONDS = 12` ohne Input automatisch nach `ATTRACT_MODE`.
+#### 2.2.1 GAME_SELECT
+
+- Oben: Logo 160 px + Titel `CHAOS ARCADE`.
+- Mitte: **horizontale Carousel** der fünf Spiele. Aktives Spiel größer (Scale 1.0), Nachbarn 0.72, dimmed.
+- Unter dem Slot: UI-Titel + eine Zeile Mechanik (`ISS DASS LABYRINTH` etc. — kurz, deutsch, max. 28 Zeichen).
+- Unten: `HI-SCORE` des **selektierten** Spiels, 6-stellig; blinkend `◀ WÄHLEN   START SPIELEN ▶`.
+- Links/Rechts bzw. Stick X wechselt `selected` (wrap: Pac-Man ↔ Frogger).
+- `command.start` oder `command.any_action` → `PLAYING` mit `registry[selected].reset()`.
+- Nach `ATTRACT_IDLE_SECONDS = 12` ohne Input → `ATTRACT_MODE`.
+- Select-Wechsel ist `activity` und hält den Attract-Timer.
+
+Carousel-Reihenfolge fest: Pac-Man, Donkey Kong, Snake, Bubble Shot, Frogger.
 
 #### 2.2.2 ATTRACT_MODE
 
-- Spielt eine **deterministische Demo** auf dem echten Maze ab: Player + Geister laufen vorberechnete oder einfache Auto-Inputs.
-- HUD zeigt `DEMO` statt Score-Interaktion.
-- Jeder Input (`command.activity == True`) bricht sofort nach `START_SCREEN` ab — nicht direkt ins Spiel, damit der Besucher den Titel sieht und bewusst startet.
-- Demo endet nach `ATTRACT_DURATION_SECONDS = 25` oder Player-Death in der Demo → zurück `START_SCREEN`.
-- Attract darf Highscore **nicht** überschreiben.
+- Spielt eine **deterministische Demo** des aktuell (oder zuletzt) selektierten Spiels, dann rotiert alle `ATTRACT_ROTATE_SECONDS = 8` zum nächsten `GameId`.
+- HUD: `DEMO` + Spielname.
+- Jeder Input → sofort `GAME_SELECT` (nicht direkt ins Spiel).
+- Attract schreibt **keine** Highscores und verbraucht keine Leben persistent.
+- Gesamtdauer einer Attract-Session max. 40 s, danach zurück `GAME_SELECT` (Idle-Loop: Select 12 s → Attract → Select).
 
 #### 2.2.3 PLAYING
 
-- Eine Runde, ein Leben-Modell für die Messe: **3 Leben**, Start mit 3.
-- Score, Leben, Level im HUD (oben, 48 px Zeile, nicht über Maze).
-- Pause existiert **nicht** (Kiosk).
-- Tod → kurzes Freeze 1,4 s, Leben−1, Respawn Mitte/Starttile. Bei 0 Leben → `GAME_OVER`.
-- Alle Dots gefressen → Level+1, Maze reset, Geister schneller (`GHOST_SPEED * (1 + 0.08 * (level-1))`, Cap 1.6×), Player-Speed Cap 1.25×.
+- Instanziiert genau ein `GameMode`.
+- HUD oben 80 px: Spielname, Score, Leben/Versuche, Level.
+- Pause existiert **nicht**.
+- `GameMode` signalisiert Ende über `Result.GAME_OVER` oder `Result.QUIT_TO_SELECT` (letzteres nur durch Inaktivität der Shell).
+- Leben, Tempo, Level-Steigerung: **pro Spiel** in §3.x, nicht global identisch.
 
 #### 2.2.4 GAME_OVER
 
-- Overlay: `GAME OVER`, finaler Score, Rang wenn Top-10.
-- Speichert Score automatisch in `data/highscores.json` (kein Namenseintrag — Messefluss; Zeitstempel reicht).
-- Zeigt 6 s lang das Overlay **oder** bis Start-Button.
-- Danach immer `START_SCREEN`.
-- Inaktivität von 30 s gilt auch hier und führt zu `START_SCREEN` (bereits durch globalen Timer abgedeckt).
+- Overlay: Spielname, `GAME OVER`, Score, Rang in der **spieleigenen** Top-10.
+- Speichert genau einmal in `enter()` via `HighscoreStore.add(game_id, score, level)`.
+- 6 s oder Start-Button → `GAME_SELECT` (Selection bleibt auf dem gerade gespielten Game).
 
 ### 2.3 Messe-Kiosk-Features
 
@@ -279,334 +311,381 @@ class StateId(Enum):
 ```
 INACTIVITY_SECONDS = 30
 ATTRACT_IDLE_SECONDS = 12
+ATTRACT_ROTATE_SECONDS = 8
 ```
 
-- „Aktivität“ = jede Richtung, jeder Button, jede Taste außer reinen Fenster-Events.
-- Timer gilt in **allen** States.
-- Bei Timeout aus `PLAYING` oder `GAME_OVER`: Runde verwerfen (Score nur speichern, wenn `GAME_OVER` bereits erreicht war; Abbruch aus `PLAYING` speichert **nicht**).
-- Timeout setzt Joystick-Deadzone-Rauschen nicht als Aktivität. Analog-Stick unter `AXIS_DEADZONE = 0.45` ist keine Aktivität.
+- Aktivität = Richtung, Action, Start. Analog unter `AXIS_DEADZONE = 0.45` zählt nicht.
+- Timeout in `PLAYING`/`GAME_OVER` → `GAME_SELECT`. Score aus `PLAYING` wird **nicht** gespeichert; aus `GAME_OVER` bereits gespeichert.
 
 #### 2.3.2 Highscore-Speicher
 
 Datei: `data/highscores.json`
 
-Schema:
-
 ```json
 {
   "updated_at": "ISO-8601",
-  "entries": [
-    {"score": 12340, "level": 2, "ts": "ISO-8601"}
-  ]
+  "games": {
+    "PACMAN": [{"score": 12340, "level": 2, "ts": "ISO-8601"}],
+    "DONKEY_KONG": [],
+    "SNAKE": [],
+    "BUBBLE_SHOT": [],
+    "FROGGER": []
+  }
 }
 ```
 
-Regeln:
-
-- Maximal 10 Einträge, sortiert `score` desc, dann `ts` desc.
-- Schreiben: temp-Datei `highscores.json.tmp` im selben Ordner, dann `os.replace` (atomar auf ext4).
-- Lesefehler / JSON corrupt → leere Liste, Datei beim nächsten Write neu.
-- `HighscoreStore.add(score, level)` ist idempotent pro GAME_OVER-Aufruf (State ruft genau einmal in `enter()`).
-- Verzeichnis `data/` wird beim ersten Write erzeugt.
+- Pro `GameId` maximal 10 Einträge, sortiert `score` desc, dann `ts` desc.
+- Atomar: `highscores.json.tmp` + `os.replace`.
+- Corrupt → leere Listen für alle fünf Keys, Rebuild beim Write.
+- Altes Schema ohne `games`-Map (nur `entries`) einmalig nach `PACMAN` migrieren.
+- `data/` wird beim ersten Write erzeugt.
 
 #### 2.3.3 Kiosk-Display
 
-- `pygame.display.set_mode((0, 0), pygame.FULLSCREEN)` auf dem Pi.
-- Env-Flag `CHAOS_WINDOWED=1` öffnet 1280×720 Fenster (Entwicklung am Mac/PC).
-- Interne Render-Surface immer 1280×720, danach `smoothscale` auf das echte Fenster. HUD- und Maze-Koordinaten bleiben fest.
-- Mauscursor: `pygame.mouse.set_visible(False)`.
+- Pi: `set_mode((0, 0), FULLSCREEN)`.
+- Dev: `CHAOS_WINDOWED=1` → 1280×720-Fenster.
+- Interne Surface immer 1280×720, danach `smoothscale` aufs Fenster.
+- `pygame.mouse.set_visible(False)`.
 
-#### 2.3.4 Operator-Hotkeys (nicht auf dem Startscreen erklären)
+#### 2.3.4 Operator-Hotkeys
 
-- `Q` + `Left-Shift`: sauberes Beenden (nur für Aufbau/Techniker).
+- `Q` + `Left-Shift`: Beenden.
 - `F11`: Fullscreen toggle (Dev).
-- `R` + `Left-Shift`: Highscores löschen.
+- `R` + `Left-Shift`: Highscores **aller** Spiele löschen.
+- `1`…`5`: im Select-Screen Direktwahl (Dev): Pac-Man … Frogger.
 
 ### 2.4 Gamepad / Keyboard Event-Loop
-
-Klasse `InputMap`. Ausgabe pro Frame: `Command`.
 
 ```
 @dataclass(frozen=True)
 class Command:
-    dx: int          # -1, 0, +1  (gewünschte Rasterrichtung X)
-    dy: int          # -1, 0, +1
-    start: bool      # Start / Pause-Äquivalent / Bestätigen
-    any_action: bool # Face-Button oder Enter/Space
-    activity: bool   # irgendein Spielerimpuls inkl. Richtung
-    quit_combo: bool # Operator-Quit
+    dx: int              # -1, 0, +1
+    dy: int              # -1, 0, +1
+    start: bool
+    action: bool         # Edge: A / Space — Sprung, Schuss, Bestätigen
+    action_held: bool    # Level: gehalten (für optionales Charging; Default ungenutzt)
+    any_action: bool
+    activity: bool
+    quit_combo: bool
 ```
 
-`dx/dy` sind **disjunkt**: niemals Diagonalen. Priorität:
+`dx/dy` disjunkt, keine Diagonalen. Priorität: D-Pad → Analog (größere Achse) → Tastatur → (0,0).
 
-1. D-Pad (HAT) wenn ≠ (0,0)
-2. Analog-Stick, Achse 0/1, Schwelle `AXIS_DEADZONE = 0.45`; die Achse mit größerem Absolutwert gewinnt (kein Diagonal)
-3. Tastatur Pfeile / WASD
-4. sonst (0,0)
-
-Letzte nicht-null Richtung wird als `queued_dir` im Player gehalten (Arcade-Klassik: Prefetch an Kreuzungen).
-
-#### 2.4.1 8BitDo DIY Kit — verbindliches Mapping
-
-Der 8BitDo DIY Kit erscheint unter Linux typischerweise als Joystick-Index 0, Name enthält `8BitDo` oder `Xbox` (X-Input-Modus) oder `Generic`. Das Mapping darf **nicht** am Gerätenamen scheitern.
-
-| Aktion | Keyboard | Gamepad (pygame.joystick) |
+| Aktion | Keyboard | Gamepad |
 |---|---|---|
-| Hoch | `K_UP`, `K_w` | HAT 0 y=+1 **oder** Axis 1 < −DEADZONE |
-| Runter | `K_DOWN`, `K_s` | HAT 0 y=−1 **oder** Axis 1 > +DEADZONE |
-| Links | `K_LEFT`, `K_a` | HAT 0 x=−1 **oder** Axis 0 < −DEADZONE |
-| Rechts | `K_RIGHT`, `K_d` | HAT 0 x=+1 **oder** Axis 0 > +DEADZONE |
-| Start / Bestätigen | `K_RETURN`, `K_SPACE` | Button 0 (A), Button 1 (B), Button 7 (Start), Button 9 (manche Firmware) |
+| Hoch | `K_UP`, `K_w` | HAT y=+1 oder Axis 1 < −DEADZONE |
+| Runter | `K_DOWN`, `K_s` | HAT y=−1 oder Axis 1 > +DEADZONE |
+| Links | `K_LEFT`, `K_a` | HAT x=−1 oder Axis 0 < −DEADZONE |
+| Rechts | `K_RIGHT`, `K_d` | HAT x=+1 oder Axis 0 > +DEADZONE |
+| Action / Sprung / Schuss | `K_SPACE`, `K_LCTRL` | Button 0 (A), Button 1 (B) |
+| Start / Bestätigen | `K_RETURN` | Button 7 / 9 (Start) **oder** Action, wenn der State Action als Start akzeptiert |
 | Aktivität | jede der oben | jede der oben |
 
-Implementierungsregeln:
+- Joystick-Hot-Plug ohne Crash.
+- `HAT_Y_INVERT = True` als Pi-Default.
+- `START_BUTTONS = {0, 1, 7, 9}` für Start in SELECT/GAME_OVER.
+- `action` ist **Edge** (down in diesem Frame), sonst feuert Bubble Shot Dauerfeuer.
 
-- `pygame.joystick.init()`; alle Sticks öffnen (`Joystick(i).init()`).
-- Hot-Plug: auf `JOYDEVICEADDED` / `JOYDEVICEREMOVED` neu enumerieren. Kein Crash bei Abziehen mitten im Spiel.
-- HAT-Werte in Pygame: x ∈ {-1,0,1}, y ∈ {-1,0,1}. **Achtung:** y-Vorzeichen variiert je nach Treiber. Deshalb beide Interpretationen testen über `HAT_Y_INVERT = True` als Config-Default auf Pi (8BitDo oft invertierte Y-Achse am Analog, HAT meist korrekt). Analog-Y ist fast immer: oben = negativ.
-- Buttons per **OR** über eine Menge `START_BUTTONS = {0, 1, 7, 9}` — nicht ein einzelner Index.
-- `get_pressed()` für Keyboard **und** Event-Queue für `JOYBUTTONDOWN` (Buttons als Edge für `start`, Richtung als Level).
-- Analog-Drift: Werte innerhalb der Deadzone sind 0. Kein `activity` bei Drift.
+#### 2.4.1 Command-Semantik in der Shell
 
-#### 2.4.2 Command-Semantik in States
-
-| State | Richtung | Start/Action |
+| State | Richtung | Action / Start |
 |---|---|---|
-| START_SCREEN | ignoriert (zählt als activity → hält Attract auf) | → PLAYING |
-| ATTRACT_MODE | activity → START_SCREEN | → START_SCREEN |
-| PLAYING | queued direction | ignoriert |
-| GAME_OVER | ignoriert (activity hält Timer) | → START_SCREEN |
+| GAME_SELECT | wechselt Slot | → PLAYING |
+| ATTRACT_MODE | → GAME_SELECT | → GAME_SELECT |
+| PLAYING | an `GameMode` | an `GameMode` (`start` ignorieren) |
+| GAME_OVER | activity hält Timer | → GAME_SELECT |
 
-### 2.5 Initialisierung und Robustheit
+#### 2.4.2 Command-Semantik in den Spielen
 
-- `SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1` setzen vor `pygame.init()`.
-- Audio: `try mixer.init except pygame.error: audio_enabled = False`.
-- Font: `pygame.font.Font(None, size)` ist akzeptabel; wenn `/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf` existiert, diesen nutzen (bessere Lesbarkeit).
-- Uncaught Exception im Loop: loggen, 2 s warten, State hart auf `START_SCREEN` (Kiosk darf nicht auf Traceback stehen bleiben). Optionaler Outer-Restart in `if __name__`.
+| Game | Richtung | Action |
+|---|---|---|
+| PACMAN | queued Grid-Richtung | ignoriert |
+| DONKEY_KONG | L/R laufen, U/D Leiter | Sprung (Edge) |
+| SNAKE | queued Richtung, kein 180° in sich selbst | ignoriert |
+| BUBBLE_SHOT | L/R dreht Kanone, U/D grob (größerer Winkelschritt) | Schuss (Edge) |
+| FROGGER | ein Rasterschritt pro Tastendruck (Edge, nicht gehalten) | ignoriert (optional: Action = Hop nach oben) |
+
+### 2.5 Robustheit
+
+- `SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1` vor `pygame.init()`.
+- Mixer-Fehler → `audio_enabled = False`.
+- Font: DejaVu Sans Mono Bold falls vorhanden, sonst `Font(None, size)`.
+- Uncaught Exception: loggen, 2 s warten, hart `GAME_SELECT`. Ein Game-Crash darf die anderen vier nicht töten — `GameMode.update` in try/except der Shell.
+
+### 2.6 GameMode-Protokoll
+
+```
+class Result(Enum):
+    CONTINUE = "CONTINUE"
+    GAME_OVER = "GAME_OVER"
+
+class GameMode(ABC):
+    id: GameId
+    def reset(self) -> None: ...
+    def on_command(self, cmd: Command) -> None: ...
+    def update(self, dt: float) -> Result: ...
+    def draw(self, surf: pygame.Surface) -> None: ...
+    def score(self) -> int: ...
+    def level(self) -> int: ...
+    def lives(self) -> int: ...
+    def attract_tick(self, dt: float) -> None: ...   # Autoplay, keine Scores
+```
 
 ---
 
-## 3. Spielmechanik & KI
+## 3. Spielmechanik
 
-### 3.1 Maze — Grid-System
+Gemeinsam:
 
-#### 3.1.1 Darstellung
+- Interne Szene unter dem 80-px-HUD, optional 96-px-Fußzeile mit `CHAOS` + Kurzsteuerung.
+- 3 Leben, sofern das Spiel Leben hat (Snake: 1 Leben / Sofort-Out, dann GAME_OVER — siehe 3.C).
+- Level-Steigerung erhöht Tempo oder Dichte, nie die Steuerung umbauen.
 
-Das Labyrinth ist ein **2D-Array von Tiles**, nicht Pixel-Geometrie.
+---
 
-```
-class Tile(Enum):
-    WALL = "#"
-    EMPTY = " "
-    DOT = "."
-    POWER = "O"
-    GATE = "-"      # Geisterhaus-Tür, Player kann nicht hindurch
-    TUNNEL = "T"    # Wrap-around links/rechts
-    SPAWN_P = "P"
-    SPAWN_G = "G"   # Geisterhaus-Innen
-```
+### 3.A PACMAN
 
-Ein Level-Stringblock in `config.py` (28 Spalten × 31 Zeilen, klassisches Pac-Man-Seitenverhältnis, an 1280×720 angepasst):
+Entspricht dem bisherigen Pac-Man-Vertrag. Kurzfassung der bindenden Regeln; Implementierung muss sie vollständig erfüllen.
 
-- Maze-Pixelbreite: `28 * 32 = 896`
-- Maze-Pixelhöhe: `31 * 32 = 992` → **zu hoch für 720**.
-
-Deshalb: **angepasstes Messe-Maze** mit genau:
+#### 3.A.1 Grid
 
 ```
 MAZE_COLS = 21
 MAZE_ROWS = 17
 TILE_SIZE = 32
-MAZE_W = 672
-MAZE_H = 544
 ```
 
-Maze wird auf der 1280×720-Surface **zentriert** (Offset `((1280-672)//2, 80)`), HUD in den oberen 80 px, unterer Streifen 720−80−544 = 96 px für Branding `CHAOS` + Steuerungshinweis.
+Tiles: `#` Wand, `.` Dot, `O` Power, `-` Gate, `T` Tunnel, `P` Player, `G` Ghost-Haus.  
+Maze zentriert: Offset `((1280-672)//2, 80)`. ≥ 80 Dots, 4 Power-Pellets, geschlossener Rand außer einem Tunnel-Paar, Haus 5×3, Player unter dem Haus.
 
-#### 3.1.2 Verbindliches Maze-Layout (ASCII)
+#### 3.A.2 Bewegung
 
-Das Layout **muss** folgende Eigenschaften erfüllen:
+Player 7.0 Tiles/s, Geister 6.2 Tiles/s. 180° sofort, 90° nur im Zentrum (`TURN_EPSILON = 3`). Prefetch `queued`. Tunnel-Wrap; Geister im Tunnel `* 0.6`.
 
-- Geschlossener Außenrand aus `#` außer genau einem `T`-Paar in der mittleren Zeile links/rechts (Tunnel).
-- Zusammenhängende Gänge; keine unerreichbaren Dots.
-- Geisterhaus 5×3 im Zentrum, Tür `-` nach oben.
-- Player-Spawn `P` unterhalb des Hauses, zentriert.
-- Genau **4** Power-Pellets `O` in den vier Quadranten, nicht in Ecken hinter Sackgassen ohne Flucht.
-- Dot-Anzahl nach dem Parsen ≥ 80 (sonst ist das Level zu leer für Messe-Feedback).
+#### 3.A.3 Scoring
 
-Beispiel-Skeleton (21×17) — die Implementierung darf kosmetisch variieren, muss aber denselben Vertrag erfüllen:
+Dot 10, Power 50, Geister 200/400/800/1600, Level-Clear 500.  
+Power: FRIGHTENED 6.0 s − 0.5 s/Level, min 2.0 s.
 
-```
-#####################
-#.........#.........#
-#O##.###.#.###.##O#.#
-#...................#
-#.##.#.#####.#.##.#.#
-#....#...#...#....#.#
-####.###.#.###.######
-T   #.# GGG #.#    T
-####.#.-----#.#.#####
-#....#...P...#....#.#
-#.##.#.#####.#.##.#.#
-#...................#
-#O##.###.#.###.##O#.#
-#.........#.........#
-#####################
-```
+#### 3.A.4 Geister
 
-(Zeilen auf exakt 21 Zeichen und 17 Zeilen bringen; das Skeleton oben ist konzeptionell. Die Implementierung liefert ein **valides, ausgezähltes** 21×17-Feld.)
+`BLINKY, PINKY, INKY, CLYDE` mit `HOUSE, LEAVE, SCATTER, CHASE, FRIGHTENED, EATEN`.  
+Target-Distanz euklidisch, Tie-Break UP/LEFT/DOWN/RIGHT.  
+Blinky = Player-Tile (Elroy-light ab < 20 Dots). Pinky = 4 vor Facing. Inky = Punktspiegelung über 2 vor Player. Clyde = Player wenn Distanz > 8, sonst Scatter-Ecke.  
+Scatter-Timer Level 1: 7/20/7/20/5/∞. Ab Level 3: 5/20/5/∞.  
+Leave-Staffel 0.2 / 0.8 / 2.4 / 4.0 s.  
+Zeichnung: Pygame-Primitives, keine SVG-Geister.
 
-#### 3.1.3 Kollision und Bewegung
+#### 3.A.5 Player
 
-Entitäten besitzen:
-
-- `tile: tuple[int, int]` — aktuelle Zelle
-- `pixel: pygame.Vector2` — Zentrum in Maze-Pixeln (nicht Screen)
-- `dir: tuple[int, int]` — aktuelle Bewegungsrichtung
-- `queued: tuple[int, int]` — Wunschrichtung
-- `speed: float` — Tiles pro Sekunde (Player Base `7.0`, Ghost Base `6.2`)
-
-Bewegungsregeln (Arcade-korrekt, vereinfacht):
-
-1. Bewegung nur entlang der Grid-Achsen.
-2. Richtungswechsel 180° (Reverse) ist **sofort** erlaubt.
-3. 90°-Wechsel nur, wenn die Entity **im Zentrum der Zelle** ist (`distance_to(tile_center) <= TURN_EPSILON`, `TURN_EPSILON = 3.0` px) **und** das Ziel-Tile begehbar ist.
-4. Ist die Wunschrichtung noch nicht legal, bleibt `queued` erhalten, die Entity läuft weiter geradeaus, bis die Kreuzung passt oder eine Wand stoppt.
-5. Wand: Entity rastet auf Tile-Zentrum ein, `dir` bleibt, Bewegung 0 bis neue legale Queue.
-6. Tunnel `T`: Verlassen über linken Rand → Erscheinen rechter `T` und umgekehrt. `pixel.x` wrap. Geister dürfen Tunnel nutzen, aber ihre Speed im Tunnel `* 0.6` (klassische Lesbarkeit).
-
-Begehbarkeit:
-
-| Tile | Player | Ghost |
-|---|---|---|
-| WALL `#` | nein | nein |
-| GATE `-` | nein | ja, nur beim Verlassen des Hauses |
-| SPAWN_G | nein | ja |
-| DOT/EMPTY/POWER/P/T | ja | ja |
-
-#### 3.1.4 Dots und Scoring
-
-| Event | Punkte |
-|---|---|
-| Dot | 10 |
-| Power-Pellet | 50 |
-| Geist 1/2/3/4 in derselben Frightened-Kette | 200 / 400 / 800 / 1600 |
-| Level-Clear Bonus | 500 |
-
-- Dot wird beim Betreten der Zelle gegessen (`tile` wechselt oder Distanz Zentrum < 6 px).
-- Power-Pellet setzt alle Geister, die nicht bereits `EATEN` sind, auf `FRIGHTENED` für `FRIGHTENED_SECONDS = 6.0` (Level 1), −0,5 s je Level, Minimum 2,0 s.
-- Frightened: Geister blau `#3B4CFF`, Speed `* 0.55`, KI = zufällige legale Richtung an jeder Kreuzung (kein Reverse außer beim Eintritt in FRIGHTENED — einmal erzwungenes Reverse).
-- Gegessen: Geist → `EATEN`, Augen-only Draw, Speed `* 1.6`, Ziel = Hausmitte, dort Respawn nach 1,0 s als `LEAVE`.
-
-Gewinn der Runde: `remaining_dots == 0`.
-
-### 3.2 Spieler
-
-Klasse `Player`.
-
-- Start: Tile `P`, Facing RIGHT, queued RIGHT.
-- Unverwundbar `INVULN_SECONDS = 2.0` nach Respawn (Blink 8 Hz). In der Zeit keine Geist-Kollision.
-- Kollision mit Geist: Kreis-Kreis, Radius je `TILE_SIZE * 0.35`. Nur wenn Geist in `CHASE` oder `SCATTER`. `FRIGHTENED` → essen. `EATEN`/`LEAVE`/`HOUSE` → keine Kollision.
-- Zeichnung: `LogoAsset.frames[facing]` zentriert auf `pixel + maze_offset`.
-- Kein Extra-Leben.
-
-### 3.3 Geister-KI (4 Geister)
-
-Klassen: `Ghost`, Enum `GhostId {BLINKY, PINKY, INKY, CLYDE}`, Enum `GhostMode {HOUSE, LEAVE, SCATTER, CHASE, FRIGHTENED, EATEN}`.
-
-#### 3.3.1 Gemeinsame Navigation
-
-An jedem Tile-Zentrum wählt der Geist **genau eine** legale Nachbarzelle. Reverse ist verboten, außer:
-
-- Mode-Wechsel nach FRIGHTENED (einmal),
-- Mode-Wechsel SCATTER↔CHASE (einmal),
-- EATEN (kürzester Weg, Reverse erlaubt).
-
-Zielwahl: `target_tile: tuple[int,int]`. Unter allen legalen Nachbarn (ohne Reverse) wird der mit minimaler **euklidischer** Distanz zum Target gewählt. Bei Gleichstand feste Priorität: **UP, LEFT, DOWN, RIGHT** (Arcade-Kanon).
-
-Scatter-Ziele (Ecken, können außerhalb liegen):
-
-| Geist | Scatter-Tile |
-|---|---|
-| BLINKY | `(MAZE_COLS-1, 0)` |
-| PINKY | `(0, 0)` |
-| INKY | `(MAZE_COLS-1, MAZE_ROWS-1)` |
-| CLYDE | `(0, MAZE_ROWS-1)` |
-
-Globaler Mode-Timer (nicht frightened/eaten):
-
-```
-Level 1: SCATTER 7s → CHASE 20s → SCATTER 7s → CHASE 20s → SCATTER 5s → CHASE ∞
-Ab Level 3: SCATTER 5s → CHASE 20s → SCATTER 5s → CHASE ∞
-```
-
-Timer pausiert während FRIGHTENED.
-
-#### 3.3.2 Persönlichkeiten (Chase-Targets)
-
-**BLINKY (rot, aggressiv):** Target = aktuelles Player-Tile. Immer direkte Jagd. Wenn remaining_dots < 20: Speed `* 1.1` („Elroy“-light).
-
-**PINKY (pink, Hinterhalt):** Target = 4 Tiles **vor** dem Spieler in dessen Facing. Facing UP nutzt den historischen Overflow **nicht** (kein +4x/−4y-Bug). Nur 4 Tiles in Facing-Richtung, geclampt an Maze-Rand.
-
-**INKY (cyan, Flanken):** Sei `pivot` = 2 Tiles vor dem Spieler. Sei `blinky` = Blinkys Tile. Target = `pivot + (pivot - blinky)` (Punktspiegelung). Ergebnis darf außerhalb des Mazes liegen.
-
-**CLYDE (orange, feige):** Wenn Distanz zu Player > 8 Tiles: Target = Player-Tile (wie Blinky). Sonst: Scatter-Ecke. Distanz euklidisch in Tiles.
-
-#### 3.3.3 House / Leave
-
-- Alle Geister starten im Haus (`G`-Tiles).
-- Leave-Staffelung nach Rundenstart oder Respawn: Blinky 0,2 s, Pinky 0,8 s, Inky 2,4 s, Clyde 4,0 s. Ab Level 2 jeweils −0,3 s, Minimum 0,1 / 0,3 / 0,8 / 1,5 s.
-- `LEAVE`: Target = Tile direkt über der Gate. Bewegung darf GATE kreuzen. Nach Verlassen: aktueller Global-Mode.
-- Eintritt nur als `EATEN`.
-
-#### 3.3.4 Zeichnung der Geister
-
-Keine SVG-Geister. Reine Pygame-Primitives, 32×32:
-
-- Körper: Kreis oben + Rechteck unten, Farbe der Id.
-- Zwei Augen (Weiß + Pupille in Bewegungsrichtung).
-- Rocksaum: 3 Halbkreise am unteren Rand.
-- FRIGHTENED: Körper blau, Augen weiß, nach 2 s Restzeit Blink Weiß/Blau 8 Hz.
-- EATEN: nur Augen.
-
-### 3.4 Kamera / Rendering-Order
-
-1. Clear Backbuffer `#0B0D10`
-2. HUD
-3. Maze-Wände
-4. Dots / Power-Pellets (Pellets skalieren mit `1 + 0.15*sin(t*8)`)
-5. Geister (EATEN zuletzt über anderen, damit Augen sichtbar)
-6. Player
-7. State-Overlays (Start / Attract-Banner / Game Over)
-8. Optionaler Scanline-Overlay 5 % Alpha (ein `src_alpha` Streifen-Surface, gecacht) — darf auf Pi weggelassen werden, wenn FPS < 50, gemessen über gleitenden 60-Frame-Schnitt. Config `ENABLE_SCANLINES = True`.
-
-### 3.5 Audio (optional, nie blockierend)
-
-Wenn Mixer verfügbar:
-
-- Waka: kurzer Square-Click beim Dot, nicht bei jedem Frame.
-- Power: tieferer Ton.
-- Death: absteigende Folge.
-- Start: aufsteigender Arpeggio.
-
-Alles synthetisch mit `pygame.sndarray` oder stummschaltbar. **Keine** WAV-Dateien Pflicht. Fehlt Audio, bleibt das Spiel identisch spielbar.
+3 Leben, INVULN 2.0 s nach Respawn. Kollision Kreis-Radius `TILE_SIZE * 0.35`. Logo-Facing-Cache.
 
 ---
 
-## 4. Implementierungsauftrag (Schritt 2 — verbindlich)
+### 3.B DONKEY KONG
 
-Wenn dieses Dokument ausgeführt wird, gilt:
+Messe-Plattformer, **eine** kompakte Baustellen-Szene (kein 4-Board-Original). Gefühl: unten starten, oben Ziel, Fässer weichen, Leitern nutzen, springen.
 
-1. Liefere lauffähigen Code gemäß Dateistruktur in 0.5. Bündelung in `main.py` ist erlaubt, wenn alle genannten Klassen existieren.
-2. Liefere `requirements.txt` und `setup_pi5.sh` mit exakten apt- und pip-Befehlen für Raspberry Pi 5 / Bookworm.
-3. Liefere eine kurze `README.md` mit Startbefehl `python3 main.py` und dem Hinweis `CHAOS_WINDOWED=1` für Entwicklung.
-4. Das Spiel muss **ohne** `logo.svg` starten und den Fallback zeichnen.
-5. Liegt `assets/logo.svg` vor, muss es automatisch als Spielerfigur in vier Richtungen erscheinen.
-6. Tastatur allein muss das ganze Spiel bedienbar machen (CI/Dev ohne Stick).
-7. Kein Netzwerk, kein pip-Download zur Laufzeit, keine Telemetrie.
-8. Kommentare im Code auf Deutsch oder Englisch, aber konsistent; öffentliche Bezeichner Englisch wie in diesem Dokument.
-9. Keine Platzhalter (`TODO`, `pass` in Gameplay-Pfaden, `NotImplementedError`).
-10. Nach der Implementierung muss ein Entwickler auf dem Pi genau diese Sequenz ausführen können:
+#### 3.B.1 Bühne
+
+- 6 horizontale Träger (Girders), leicht gegenläufig geneigt (±4° optisch, Kollision als Achsen-Segmente).
+- Pro Träger 1–2 Leitern, die den nächsthöheren Träger verbinden. Mindestens ein durchgehender Pfad nach oben.
+- Oben links oder mitte: Boss-Platzhalter `KongActor` (rechteckiger Primitive-Körper + getintes Logo 64 px, **nicht** als Player steuerbar).
+- Oben rechts: Ziel `GOAL` (Flagge/Portal, bernstein). Berühren = Level-Clear + 500 Punkte + nächste, schnellere Runde.
+- Unten: Player-Spawn.
+
+Interne Playfield-Größe: 960×560, zentriert unter HUD.
+
+#### 3.B.2 Physik (arkade, nicht Box2D)
+
+- Laufen: 180 px/s. Gravitation 2200 px/s², Terminal 720 px/s.
+- Sprung: Edge-Action, nur wenn `grounded`. `jump_v = -620` px/s.
+- Leiter: wenn `dy < 0` und Overlap mit Leiter-Rect ≥ 40 % der Spielerbreite → Climb-State, 140 px/s vertikal, Gravitation aus. `dy > 0` steigt herab. Horizontal auf Leiter gedämpft (0).
+- Kein Double-Jump, kein Luft-Steuern über 35 % der Boden-Speed hinaus.
+- Träger-Kollision: Füße gegen Oberkante. Durch Leiternlöcher darf der Spieler fallen, wenn nicht im Climb-State.
+
+#### 3.B.3 Fässer und Gefahr
+
+- `KongActor` wirft alle `BARREL_INTERVAL` (1.6 s Level 1, −0.12 s/Level, min 0.7 s) ein Fass.
+- Fässer folgen Trägern (rollen in Neigungsrichtung), fallen am Ende eine Ebene tiefer, despawnen unten.
+- 15 % Chance: Fass wird zum **Fallfass** (vertikal, schneller) — telegraphiert durch kürzeres Sprite.
+- Kollision Spieler/Fass: Kreis-Kreis, außer während Sprung **über** das Fass (Spieler-Fuß y < Fass-Oberkante − 4 px) → +100 Punkte, kein Schaden.
+- 3 Leben. Tod: Freeze 1.2 s, Respawn unten. 0 Leben → GAME_OVER.
+- Optional ab Level 2: ein Feuergeist auf dem untersten Träger, KI = läuft auf den Spieler zu, kehrt an Leiter/Rand um. Primitive-Zeichnung.
+
+#### 3.B.4 Steuerung und Logo
+
+- LEFT/RIGHT: Facing + Lauf.
+- UP/DOWN: Leiter.
+- Action: Sprung.
+- Logo nicht auf den Kopf drehen. Auf Leitern: letztes L/R-Facing behalten.
+
+#### 3.B.5 Scoring
+
+| Event | Punkte |
+|---|---|
+| Fass übersprungen | 100 |
+| Ebene erreicht (Träger-Index steigt) | 50 (einmal pro Ebene pro Leben) |
+| Ziel | 500 |
+| Restzeit-Bonus | `int(remaining_seconds) * 10` |
+
+Zeitlimit pro Versuch: 45 s, Anzeige im HUD. Timeout = Tod.
+
+---
+
+### 3.C SNAKE
+
+Klassisches Wachsen auf Raster. Sofort verständlich, härteste Highscore-Kurve.
+
+#### 3.C.1 Feld
+
+```
+SNAKE_COLS = 28
+SNAKE_ROWS = 16
+SNAKE_TILE = 32
+```
+
+Feld zentriert unter HUD, 1-Tile-Rand als Wand (sichtbar cyan). Kein Wrap — Wandkontakt ist Tod (Messe: klare Konsequenz).
+
+#### 3.C.2 Bewegung
+
+- Tick-basiert, nicht pixelgenau: `STEP_SECONDS = 0.16` Level 1, `* 0.94` je Food, Minimum 0.07 s.
+- Input wird gequeued. **Verbot:** 180° direkt in das erste Körpersegment (Input verwerfen, alte Richtung behalten).
+- Pro Step genau ein Tile. Kopf = neu, Schwanz fällt außer nach Food (Wachstum +1).
+- Startlänge 4, Start Mitte, Facing RIGHT.
+
+#### 3.C.3 Food und Score
+
+- Ein Food (`O`/Bernstein-Kreis oder getintes Mini-Logo) auf zufälligem freien Tile, nicht auf dem Körper.
+- Essen: +10 × aktuelle Länge (steigender Reiz). Level = `1 + foods // 5`.
+- Kein zweites Food gleichzeitig.
+- 1 Leben: Wand oder Selbstkollision → sofort GAME_OVER (kein Respawn — Snake-Erwartung). Attract darf weich resetten.
+
+#### 3.C.4 Darstellung
+
+- Kopf: `logo_tile[facing]`.
+- Körper: Kette `logo_snake_body`, Alpha 220 → 90 zum Schwanz.
+- Food pulsiert 2 Hz in der Größe ±8 %.
+
+---
+
+### 3.D BUBBLE SHOT
+
+Aim-and-match, Puzzle-Bobble-Feeling, CHAOS-Farben. Kein originaler Bobble-Sprite.
+
+#### 3.D.1 Spielfeld
+
+- Hex- oder Offset-Row-Grid: `BUBBLE_COLS = 10`, sichtbare Reihen max. 12, Kugel-Durchmesser 36 px.
+- Decke fest. Neue Reihe schiebt alle `CEILING_EVERY_SHOTS = 6` Schüsse nach unten (Level 1), ab Level 3 alle 5, ab Level 5 alle 4.
+- Bodenlinie 80 px über dem Fußbereich: berührt eine Kugel die Linie → GAME_OVER (nach kurzem Flash).
+- Kanone mittig unten. Logo als Kanonenkopf, Lauf = cyan Rechteck.
+
+#### 3.D.2 Zielen und Schuss
+
+- Winkelbereich **−75° … +75°** (0° = senkrecht nach oben).
+- LEFT/RIGHT: `±90°/s` analog gehalten. UP/DOWN: Raster ±8°.
+- Action-Edge: feuert die **aktuelle** Kugel. Nächste Kugel liegt sichtbar rechts der Kanone (Preview).
+- Flug: 720 px/s gerade, Reflektion **nur** an linker/rechter Wand (`vx = -vx`). Keine Decken-Reflektion — Kontakt Decke/Kugel = Snap ins Grid.
+- Genau **eine** fliegende Kugel gleichzeitig.
+
+#### 3.D.3 Farben und Match
+
+Farben (max. 4 auf Level 1, 5 ab Level 3):
+
+`#2DE2E6`, `#FF3B3B`, `#FF7AD9`, `#FFB703`, `#3BD1FF`
+
+- Snap: nächster freier Grid-Slot am Kontaktpunkt.
+- Nach Snap: Flood-Fill gleiche Farbe. ≥ 3 → entfernen, +50 pro Kugel.
+- Hängende Gruppen ohne Verbindung zur Decke fallen, +20 pro Fall-Kugel.
+- Kette in einem Schuss: Multiplier 1, 2, 3 … auf den Fall-Bonus.
+- Level-Clear: Feld leer → +1000, neue kompaktere Startformation, schnelleres Ceiling.
+
+#### 3.D.4 Startformation und Leben
+
+- 5 gefüllte Reihen, zufällig aber **keine** sofortigen 3er auf Start (Generator retry max. 20).
+- 3 Leben nur bei „Bodenlinie berührt“? Nein: **1 Versuch** pro Runde (Puzzle-Klarheit). GAME_OVER bei Bodenkontakt. Clear ist der einzige Fortschritt.
+- Score überlebt Level-Clear in derselben PLAYING-Session (mehrere Felder, ein Leben).
+
+#### 3.D.5 Darstellung
+
+- Ruhende Kugeln: gefüllte Kreise + 2 px Outline + kleines Logo-Watermark (alpha 40), damit CHAOS sichtbar bleibt ohne Lesbarkeit zu töten.
+- Fliegende Kugel: `logo_bubble` getintet.
+- Aim-Hilfslinie: gepunktet, max. 1 Reflektion, Alpha 90 — Pflicht für Messe (ohne sie ist das Spiel unspielbar am Pult).
+
+---
+
+### 3.E FROGGER
+
+Raster-Queren: Straße, Mittelstreifen, Fluss, 5 Nester.
+
+#### 3.E.1 Layout (13 Reihen × 15 Spalten)
+
+Von unten nach oben:
+
+0. Safe Home (Startreihe, Player-Spawn Mitte)  
+1–4. Straße: 4 Lanes, Fahrzeuge  
+5. Safe Median  
+6–9. Wasser: 4 Lanes, Holz/Schildkröten  
+10. Bank  
+11. 5 Nester (`HOME`), getrennt durch Mauern  
+12. (oben, dekorativ)
+
+`FROG_TILE = 40` → 15×40 = 600 px breit, 13×40 = 520 px hoch, zentriert.
+
+#### 3.E.2 Bewegung
+
+- Input ist **Edge pro Richtung**: ein Tap = ein Tile. Halten feuert **nicht** automatisch (kein Rutschen).
+- Cooldown `HOP_COOLDOWN = 0.12` s, damit Stick-Prellen keine Doppeltreppe auslöst.
+- Illegal: in Wand/Nest-Mauer, aus dem Feld, in ein bereits gefülltes Nest.
+- Wasser **ohne** Floater unter den Füßen (nach dem Hop, 1 Frame Toleranz) = Tod.
+- Straße: AABB gegen Fahrzeuge = Tod.
+
+#### 3.E.3 Hazard-Bewegung
+
+- Jede Lane hat eigene Speed und Richtung, gegenläufig benachbart.
+- Autos: 2–3 Rects, Lücken immer ≥ 2 Tiles bei Level 1.
+- Fluss: Logs 2–4 Tiles lang; Schildkröten können ab Level 2 alle 3 s für 1.0 s tauchen.
+- Spieler auf Floater erbt `vx` der Lane (pixelgenau zwischen Hops, gerastert beim nächsten Hop).
+- Wrap: Hazards verlassen links und kommen rechts wieder (und umgekehrt).
+- Level+1 wenn alle 5 Nester gefüllt: Speeds `* 1.12`, eine zusätzliche Auto-Lane-Dichte, Timer härter.
+
+#### 3.E.4 Leben, Zeit, Score
+
+- 3 Leben. Tod: Respawn Startreihe, aktueller Nest-Fortschritt bleibt.
+- Timer pro Versuch: 20 s → 0 = Tod. Reset bei erfolgreichem Nest.
+- Nest erreichen: +200 + `int(remaining_s)*10`. Vorwärts-Hop +10. Alle 5 Nester: +500 und Level-Up, Nester leeren.
+
+#### 3.E.5 Darstellung
+
+- Player: `logo_tile[facing]`.
+- Autos: Neon-Rechtecke (rot/pink), keine Sprite-Roms.
+- Logs: dunkles Cyan-Braun-Rechteck.
+- Nester: bernstein-Mulde; gefüllt = Mini-Logo 20 px.
+
+---
+
+## 4. Implementierungsauftrag
+
+Reihenfolge **zwingend** (jedes Game nach Shell spielbar committen, nicht fünf halbfertige):
+
+1. Shared Shell: Display, Input, LogoAsset, Highscore, GAME_SELECT, ATTRACT-Gerüst, GAME_OVER.
+2. `PacmanMode` vollständig (Abnahme §5.A).
+3. `SnakeMode` (schnellster zweiter Titel).
+4. `FroggerMode`.
+5. `BubbleShotMode`.
+6. `DonkeyKongMode`.
+7. Attract rotiert durch alle implementierten Games; fehlende Modes dürfen noch nicht im Carousel stehen **oder** sitzen als `Coming Soon` — **verboten**. Carousel zeigt nur fertige Games. Zielstand: alle fünf fertig.
+
+Weitere Regeln:
+
+1. `requirements.txt` + `setup_pi5.sh` für Pi 5 / Bookworm.
+2. README: `python3 main.py`, `CHAOS_WINDOWED=1`, kurze Spielübersicht der fünf Titel.
+3. Ohne `logo.svg` starten alle fünf mit Fallback.
+4. Mit `logo.svg` ist das Logo in jedem Titel der Avatar (siehe 1.4).
+5. Tastatur allein reicht für alle Spiele inkl. Action (Space).
+6. Kein Netzwerk, kein Runtime-pip, keine Telemetrie.
+7. Bezeichner Englisch wie in diesem Dokument; keine `TODO`/`pass` in Gameplay-Pfaden.
+8. Pi-Start:
 
 ```
 chmod +x setup_pi5.sh
@@ -618,30 +697,50 @@ python3 main.py
 
 ## 5. Abnahmekriterien (Definition of Done)
 
-- [ ] Start auf Pi 5 und auf Desktop (windowed) ohne Crash, auch ohne SVG und ohne Gamepad.
-- [ ] Logo-Pipeline: cairosvg → pygame → Fallback, nachweisbar über stdout-Logs.
-- [ ] Richtungswechsel ändert Logo-Orientierung (Flip/Rotate-Cache).
-- [ ] 8BitDo D-Pad, Analog (Deadzone), A/Start und Keyboard parallel.
-- [ ] 30-s-Inaktivität aus PLAYING kehrt zu START_SCREEN zurück ohne Highscore-Write.
-- [ ] 12 s auf START_SCREEN startet ATTRACT_MODE; Input zurück zum Titel.
-- [ ] Highscores überleben Prozess-Neustart (`data/highscores.json`).
-- [ ] Vier Geister mit unterscheidbarem Chase-Verhalten, Frightened, Eaten-Return.
-- [ ] Dots essen, Power-Pellets, Level-Clear, 3 Leben, GAME_OVER-Overlay.
-- [ ] Tunnel-Wrap funktioniert für Player und Geister.
-- [ ] Fullscreen-Kiosk, Cursor unsichtbar, Operator-Quit Shift+Q.
-- [ ] Stabil ≥ 50 FPS auf Pi 5 bei 1280×720 intern.
+### 5.0 Shared Shell
+
+- [ ] Start auf Pi 5 und Desktop (windowed) ohne Crash, ohne SVG, ohne Gamepad.
+- [ ] Carousel zeigt genau fünf Titel, Wrap, Hi-Score wechselt pro Slot.
+- [ ] Start lädt das gewählte Spiel; Game-Over kehrt zur Auswahl auf demselben Slot zurück.
+- [ ] 12 s Idle → Attract; Attract rotiert Titel; Input → SELECT.
+- [ ] 30 s Idle in PLAYING → SELECT, kein Highscore-Write.
+- [ ] Highscores getrennt pro Game, überleben Neustart; Legacy-`entries` → PACMAN.
+- [ ] Logo-Pipeline cairosvg → pygame → Fallback, Logs auf stdout.
+- [ ] 8BitDo D-Pad, Analog, A/Start und Keyboard parallel; Action ist Edge.
+- [ ] Fullscreen-Kiosk, Cursor aus, Shift+Q beendet.
+- [ ] ≥ 50 FPS in jedem aktiven Spiel.
+
+### 5.A Pac-Man
+
+- [ ] Richtungs-Logo, 4 Geister-Persönlichkeiten, Frightened/Eaten, Dots, Power, Tunnel, 3 Leben, Level-Clear.
+
+### 5.B Donkey Kong
+
+- [ ] Laufen, Leitern, Sprung, Fässer mit Träger-Logik, Ziel oben, Zeitlimit, Fass-Skip-Punkte, 3 Leben.
+
+### 5.C Snake
+
+- [ ] Queue ohne 180°-Selbstkill, Wachstum, Speed-up, Wand = Tod, Kopf = Logo.
+
+### 5.D Bubble Shot
+
+- [ ] Winkeln, Schuss, Wandreflex, Grid-Snap, Match-≥3, Fallgruppen, Aim-Linie, Ceiling-Push, Boden = Out.
+
+### 5.E Frogger
+
+- [ ] Edge-Hops, Autos, Logs, Wasser-Tod, 5 Nester, Timer, Level nach Full-Home.
 
 ---
 
 ## 6. Self-Check vor dem Commit der Implementierung
 
-Der implementierende Agent prüft vor Abschluss:
-
-1. Existieren alle in §0.5 genannten Dateien **oder** deren vollständige Äquivalente in `main.py`?
-2. Gibt es genau eine Quelle für Konstanten (`config.py` oder `CONFIG`-Block)?
-3. Wird `logo.svg` niemals pro Frame gerastert?
-4. Sind Diagonalen unmöglich?
-5. Kann das Spiel 2 Minuten ohne Input im Attract/Start-Zyklus allein laufen?
+1. Existieren `GameMode` und fünf Mode-Klassen, auch wenn noch in `main.py` gebündelt?
+2. Eine Shared-Quelle für Display/Input/Logo/Highscore?
+3. Wird `logo.svg` niemals pro Frame gerastert — auch nicht für Bubble-Winkel (Cache!)?
+4. Sind Diagonalen in Pac-Man/Snake/Frogger unmöglich? (DK: in der Luft begrenztes Strafen erlaubt, kein 8-Wege-Run.)
+5. Kann das Kabinett 2 Minuten ohne Input im Select/Attract-Zyklus allein laufen?
 6. Ist `data/highscores.json` gitignored?
+7. Zeigt SELECT wirklich alle fünf **spielbaren** Titel — keinen Platzhalter-Slot?
+8. Crash in einem Mode fängt die Shell und kehrt zu SELECT zurück?
 
 Ende des Master-Prompts. Dieses Dokument ist die einzige Wahrheitsquelle für die Code-Generierung.
