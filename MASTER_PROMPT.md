@@ -28,9 +28,9 @@ Bewusst **nicht** im Katalog (auch nicht als späterer Nachzug): Tetris-Klone (M
 
 Dieses Dokument ist verbindlich. CHAOS Arcade ist **kein** reiner Pac-Man-Klon. Pac-Man ist das **erste** Spiel im Kabinett und der **Default** nach Erststart, nicht das einzige. Es gibt genau **sieben** Titel. Besucher spielen immer nur das vom Operator freigeschaltete Spiel. Jede nachfolgende Implementierung muss sich **wortgetreu** an diese Vorgaben halten. Abweichungen sind nur zulässig, wenn sie einen Laufzeitfehler auf dem Raspberry Pi 5 verhindern — und müssen dann im Code kommentiert werden.
 
-Rechtlicher Rahmen: Es werden **keine** originalen ROM-Assets, Sprites oder Melodien Dritter eingebettet und **keine** offiziellen Logo-Dateien (SVG/PNG) von Microsoft oder Nintendo geladen. Keine Produktnamen wie E3, E5, M365 auf dem Screen. Mechanik und Feeling der Arcade-Vorbilder dürfen anklingen; Gegner und Welt sind **Lizenzchaos**. Visuelle Identität des **Helden** ist ausschließlich das CHAOS-Logo.
+Rechtlicher Rahmen: Es werden **keine** originalen ROM-Assets, Sprites oder Melodien Dritter eingebettet und **keine** offiziellen Logo-Dateien (SVG/PNG) von Microsoft oder Nintendo geladen. Keine Produkt-SKUs wie E3, E5, M365 auf dem Screen. Mechanik und Feeling der Arcade-Vorbilder dürfen anklingen; Gegner und Welt sind **Lizenzchaos gegen Microsoft**. Visuelle Identität des **Helden** ist ausschließlich das CHAOS-Logo.
 
-**Eine** erlaubte Vendor-Anspielung: der Donkey-Kong-Boss (Gorilla) trägt ein per Primitive gezeichnetes Microsoft-Shirt (vier farbige Quadrate + Wort `MICROSOFT`, siehe 3.B.1). Nirgends sonst.
+Microsoft-Anspielung ist in **jedem** der sieben Spiele Pflicht — nur über `draw_ms_mark` und den Schriftzug `MICROSOFT` (siehe 0.8). Kein heruntergeladenes Microsoft-Asset.
 
 ---
 
@@ -131,7 +131,7 @@ CHAOS_PacMan/
 └── README.md
 ```
 
-Die erste Auslieferung darf alles in `main.py` vereinen, **muss** aber `GameId`, `GameMode`, `LogoKind`, `CabinetStore`, `HighscoreStore`, `draw_stick_hero`, `StateId.NAME_ENTRY` und die sieben Mode-Klassen (`PacmanMode`, `DonkeyKongMode`, `SnakeMode`, `BubbleShotMode`, `FroggerMode`, `InvadersMode`, `BreakoutMode`) namentlich enthalten.
+Die erste Auslieferung darf alles in `main.py` vereinen, **muss** aber `GameId`, `GameMode`, `LogoKind`, `CabinetStore`, `HighscoreStore`, `draw_stick_hero`, `draw_ms_mark`, `StateId.NAME_ENTRY` und die sieben Mode-Klassen (`PacmanMode`, `DonkeyKongMode`, `SnakeMode`, `BubbleShotMode`, `FroggerMode`, `InvadersMode`, `BreakoutMode`) namentlich enthalten.
 
 ### 0.6 Visuelle Identität (Arcade / CHAOS)
 
@@ -182,6 +182,7 @@ Gegner-Cast (überall dieselben, nur Primitive, **ohne** CHAOS-Logo):
 | `KLAUSEL` | Kleingedruckt-Ziegel | Invaders-Reihen, Breakout-Steine |
 | `AE` | Fliegende Aktentasche | Bonus-UFO |
 | `TENANT` | Wolken-Floß | Frogger-Fluss |
+| `GORILLA` | Brauner Affe, Microsoft-Shirt | Nur DK-Boss, nicht der Held |
 
 Idle-Mechanikzeile (deutsch, max. 28 Zeichen):
 
@@ -195,7 +196,38 @@ Idle-Mechanikzeile (deutsch, max. 28 Zeichen):
 | INVADERS | `SCHIESS DEN AUDIT AB` |
 | BREAKOUT | `BRICH DEN LOCK-IN` |
 
-SKU-Typen auf dem Screen nur als Gattung: `BASIS`, `PREMIUM`, `FRONTLINE`, `ADDON`, `SANDBOX`. Keine Microsoft-Produktnamen.
+SKU-Typen auf dem Screen nur als Gattung: `BASIS`, `PREMIUM`, `FRONTLINE`, `ADDON`, `SANDBOX`. Keine SKU-Namen wie E3/E5/M365.
+
+### 0.8 Microsoft-Motif (jedes Spiel)
+
+Gemeinsame Primitive, einmal implementieren, überall nutzen:
+
+```
+MS_RED    = #F35325
+MS_GREEN  = #81BC06
+MS_BLUE   = #05A6F0
+MS_YELLOW = #FFBA08
+
+def draw_ms_mark(surf, dest: pygame.Rect, *, label: bool = False) -> None
+```
+
+- Vier Quadrate 2×2 in der Reihenfolge UL rot, UR grün, LL blau, LR gelb. Gap = 12 % der kleineren Kante, min 1 px.
+- `label=True` und `dest.height >= 22`: darunter `MICROSOFT` in DejaVu Sans Mono, schwarz oder Warmweiß (je nach Hintergrund), zentriert, nicht größer als die Markenbreite.
+- Nie strecken. Nie als Held verwenden. Nie eine Datei von microsoft.com laden.
+
+Pflicht-Einsatz — jedes Spiel muss das Motiv **während PLAYING** unübersehbar zeigen:
+
+| Game | Wo das Motiv sitzt |
+|---|---|
+| PACMAN | Power-Pellets = `draw_ms_mark` (Optimize-Lizenz). Jeder Auditor trägt ein 6-px-Mark auf der Brust. Geisterhaus-Dach: `MICROSOFT`. |
+| DONKEY_KONG | Gorilla-Shirt (4 Quadrate + Label). Jede TRUEUP-Rolle trägt ein 8-px-Mark. GOAL-Siegel enthält das Mark. |
+| SNAKE | Food ist das Mark (16–20 px), pulsiert. Wandecken oben: kleines Mark. |
+| BUBBLE_SHOT | Die ersten vier Kugelfarben **sind** die vier MS-Farben. Deckenbalken: wiederholtes Mark + einmal `MICROSOFT`. |
+| FROGGER | Jedes `RENEWAL`-Auto: Karosserie in einer MS-Farbe, Mark auf der Haube. Nester leer: blasses Mark; gefüllt: CHAOS-FACE darüber. |
+| INVADERS | Formation zeilenweise MS-Farben. Jeder Invader: Mini-Mark. `AE`-UFO: Mark + `MICROSOFT` auf der Aktentasche. |
+| BREAKOUT | Steinreihen rotieren durch die vier MS-Farben. 2-Hit-`LOCKIN`: großes Mark auf dem Stein. |
+
+Idle/Attract des jeweiligen Titels zeigt dasselbe Motiv (Power-Pellet, Gorilla-Shirt, Food, Decke, Auto, Formation bzw. Steinwand) — nicht nur den Schriftzug im HUD.
 
 ---
 
@@ -704,7 +736,7 @@ Player 7.0 Tiles/s, Geister 6.2 Tiles/s. 180° sofort, 90° nur im Zentrum (`TUR
 #### 3.A.3 Scoring
 
 Dot 10, Power 50, Geister 200/400/800/1600, Level-Clear 500.  
-Power: FRIGHTENED 6.0 s − 0.5 s/Level, min 2.0 s.
+Power-Pellet = `draw_ms_mark` (Microsoft-Lizenz). FRIGHTENED 6.0 s − 0.5 s/Level, min 2.0 s.
 
 #### 3.A.4 Geister
 
@@ -722,7 +754,8 @@ Zeichnung: Pygame-Primitives, **kein** CHAOS-Logo.
 | INKY | SKUWIRR | Etikettenstapel, CHAOS-Palette |
 | CLYDE | SHELFWARE | grauer Schlüsselkarton |
 
-FRIGHTENED = `COMPLIANT`: cyan, flieht. EATEN = leeres Klemmbrett-Augenpaar zur Basis.
+FRIGHTENED = `COMPLIANT`: cyan, flieht. EATEN = leeres Klemmbrett-Augenpaar zur Basis.  
+Brust jedes Geistes: `draw_ms_mark` 6×6. Geisterhaus-Dachzeile: `MICROSOFT`.
 
 #### 3.A.5 Player
 
@@ -744,6 +777,7 @@ Messe-Plattformer, **eine** kompakte Vertragsturm-Szene (kein 4-Board-Original).
     oben links `#F35325`, oben rechts `#81BC06`, unten links `#05A6F0`, unten rechts `#FFBA08`.
     Darunter zentriert der Schriftzug `MICROSOFT` in DejaVu Sans Mono, 10 px, `#0B0D10`.
   - Keine heruntergeladene Microsoft-Grafik, keine Word-/Azure-Bildmarke, kein Windows-Flaggen-SVG. Nur diese vier Rects + Text.
+  - Shirt-Mark kommt aus `draw_ms_mark(..., label=True)`, nicht aus einer zweiten Zeichenroutine.
   - Wurf-Pose: rechter Arm hebt sich 200 ms, dann TRUEUP-Rolle. Idle: leichtes 1 Hz-Atmen (ScaleY 0.98–1.02, nur Körper, Shirt sitzt fest).
 - Oben rechts: Ziel `GOAL` (Optimierungs-Siegel, bernstein). Berühren = Level-Clear + 500 Punkte + nächste, schnellere Runde.
 - Unten: Player-Spawn.
@@ -761,7 +795,7 @@ Interne Playfield-Größe: 960×560, zentriert unter HUD.
 #### 3.B.3 Fässer und Gefahr
 
 - `GorillaActor` wirft alle `BARREL_INTERVAL` (1.6 s Level 1, −0.12 s/Level, min 0.7 s) eine **TRUEUP-Rolle**.
-- Rollen folgen Trägern (rollen in Neigungsrichtung), fallen am Ende eine Ebene tiefer, despawnen unten.
+- Rollen folgen Trägern (rollen in Neigungsrichtung), fallen am Ende eine Ebene tiefer, despawnen unten. Jede Rolle: `draw_ms_mark` 8×8 auf der Stirnseite. GOAL: Siegel mit Mark.
 - 15 % Chance: Rolle wird zum **Fall-Notice** (vertikal, schneller) — telegraphiert durch kürzeres Rect.
 - Kollision Spieler/Rolle: Kreis-Kreis, außer während Sprung **über** die Rolle (Strichfuß-y < Rollen-Oberkante − 4 px) → +100 Punkte, kein Schaden.
 - 3 Leben. Tod: Freeze 1.2 s, Respawn unten. 0 Leben → GAME_OVER.
@@ -819,7 +853,7 @@ Feld zentriert unter HUD, 1-Tile-Rand als Wand (sichtbar cyan). Kein Wrap — Wa
 
 - Kopf: FACE `logo_tile[facing]`, keine Beine.
 - Körper: Kette FACE `logo_snake_body`, Alpha 220 → 90 zum Schwanz.
-- Food: `SHELFWARE`-Token (grauer Schlüssel-Rect oder Mini-FACE getintet bernstein), pulsiert 2 Hz ±8 %.
+- Food: `draw_ms_mark` 16–20 px (ungenutzte Microsoft-Lizenz / Shelfware), pulsiert 2 Hz ±8 %. Obere Wandecken: je ein 10-px-Mark. Kein FACE als Food.
 
 ---
 
@@ -844,15 +878,17 @@ Aim-and-match, Puzzle-Bobble-Feeling, CHAOS-Farben. Kein originaler Bobble-Sprit
 
 #### 3.D.3 Farben und Match
 
-Farben = SKU-Gattungen (max. 4 auf Level 1, 5 ab Level 3), ohne Microsoft-Namen:
+Farben = SKU-Gattungen. Level 1 nutzt **genau** die vier Microsoft-Farben; ab Level 3 kommt SANDBOX dazu:
 
 | Farbe | Gattung |
 |---|---|
-| `#2DE2E6` | BASIS |
-| `#FF3B3B` | PREMIUM |
-| `#FF7AD9` | FRONTLINE |
-| `#FFB703` | ADDON |
+| `MS_RED` | BASIS |
+| `MS_GREEN` | PREMIUM |
+| `MS_BLUE` | FRONTLINE |
+| `MS_YELLOW` | ADDON |
 | `#3BD1FF` | SANDBOX |
+
+Deckenbalken: `draw_ms_mark` wiederholt + einmal `MICROSOFT` mittig.
 
 - Snap: nächster freier Grid-Slot am Kontaktpunkt.
 - Nach Snap: Flood-Fill gleiche Farbe. ≥ 3 → entfernen, +50 pro Kugel.
@@ -918,9 +954,9 @@ Von unten nach oben:
 #### 3.E.5 Darstellung
 
 - Player: FACE `logo_tile[facing]` plus `draw_stick_hero(..., HOP|IDLE)` — Beine beim Hop 80 ms nach hinten.
-- Autos: `RENEWAL`-Kalender, neon-rot/pink, keine Sprite-Roms.
+- Autos: `RENEWAL`, Karosserie rotiert durch `MS_RED`/`MS_GREEN`/`MS_BLUE`/`MS_YELLOW`, Haube = `draw_ms_mark` 10 px.
 - Flöße: `TENANT`, dunkles Cyan-Braun-Rechteck.
-- Nester: bernstein-Mulde; gefüllt = FACE `logo_nest` 20 px (Held sitzt, keine Beine im Nest).
+- Nester: bernstein-Mulde mit blassem Mark; gefüllt = FACE `logo_nest` 20 px über dem Mark (Held sitzt, keine Beine im Nest).
 
 ---
 
@@ -943,11 +979,11 @@ Playfield 720×560, zentriert unter dem HUD. 40 px Seitenrand. Spieler-Schiff au
 #### 3.F.3 Formation
 
 - Level 1: 5 Reihen × 8 Spalten, Zelle 36 px, Abstand 8 px.
-- Farben zeilenweise: unten `SHELFWARE`, dann `ADDON`/`SKUWIRR`, oben `KLAUSEL`/`AUDITOR`.
+- Farben zeilenweise die vier MS-Farben, oben ggf. CHAOS-Pink für `AUDITOR`. Jeder Invader: `draw_ms_mark` 8 px.
 - Blockbewegung: 40 px/s Level 1, am Rand umkehren und 12 px sinken. Tempo `* 1.10` je Welle, plus `* 1.04` je getötetem Invader (klassische Beschleunigung).
 - Globaler Bomben-Takt: alle 1.2 s Level 1, −0.08 s/Welle, min 0.45 s. Zufällige lebende untere Kante schießt. Bombe 220 px/s nach unten, Primitive.
 - Unterkante der Formation erreicht Spieler-y → sofort GAME_OVER (alle Restleben verloren).
-- Welle leer: +500, nächste Welle (max. 6 Reihen). UFO = `AE` (Aktentasche) alle 12 s oben durch, 150 Punkte, 180 px/s, **nur** Primitive — kein CHAOS-Logo.
+- Welle leer: +500, nächste Welle (max. 6 Reihen). UFO = `AE` (Aktentasche) alle 12 s oben durch, 150 Punkte, 180 px/s. Aktentasche: `draw_ms_mark(..., label=True)`. Kein CHAOS-Logo.
 
 #### 3.F.4 Scoring
 
@@ -985,8 +1021,8 @@ Playfield 800×560, zentriert. Wände links/rechts/oben 12 px cyan. Unten offen.
 #### 3.G.3 Steine
 
 - Level 1: 6 Reihen × 10 Spalten, Stein 72×22, Gap 4 px, oberer Offset 24 px.
-- Reihenfarben CHAOS-Palette. Punkte oben → unten: 30 / 25 / 20 / 15 / 10 / 10.
-- Keine unzerstörbaren Steine auf Level 1. Ab Level 2: genau 4 graue 2-Hit-`LOCKIN`-Steine (Outline dick, Schloss-Kerbe).
+- Reihenfarben rotieren durch `MS_RED` / `MS_GREEN` / `MS_BLUE` / `MS_YELLOW`. Punkte oben → unten: 30 / 25 / 20 / 15 / 10 / 10.
+- Keine unzerstörbaren Steine auf Level 1. Ab Level 2: genau 4 graue 2-Hit-`LOCKIN`-Steine (Outline dick, Schloss-Kerbe, großes `draw_ms_mark` mittig).
 - Feld leer: +500, nächste Wand (eine Reihe mehr, max. 8; Speed-Reset auf `360 * 1.06^(level-1)`).
 
 #### 3.G.4 Scoring und Leben
@@ -1053,13 +1089,14 @@ python3 main.py
 - [ ] Highscores getrennt pro Game, inkl. Name, überleben Neustart; Legacy-`entries` → PACMAN mit `name = "---"`.
 - [ ] Logo-Pipeline FACE/MARK/BADGE, cairosvg → pygame → Fallback, Logs auf stdout.
 - [ ] CHAOS-Logo ist in jedem Titel der Held. Gegner nie das Logo. Nur DK und Frogger haben Strichbein/-arm.
+- [ ] `draw_ms_mark` ist in allen sieben Spielen während PLAYING sichtbar (Tabelle 0.8). Keine offizielle Microsoft-Datei.
 - [ ] 8BitDo D-Pad, Analog, A/Start/Select und Keyboard parallel; Action ist Edge; Start gehalten + Richtung = Operator, nicht Spielstart.
 - [ ] Fullscreen-Kiosk, Cursor aus, Shift+Q beendet.
 - [ ] ≥ 50 FPS in jedem aktiven Spiel.
 
 ### 5.A Pac-Man
 
-- [ ] Richtungs-Logo, 4 Geister-Persönlichkeiten, Frightened/Eaten, Dots, Power, Tunnel, 3 Leben, Level-Clear.
+- [ ] Richtungs-Logo, 4 Geister-Persönlichkeiten, Frightened/Eaten, Dots, Power = MS-Mark, Tunnel, 3 Leben, Level-Clear.
 
 ### 5.B Donkey Kong
 
@@ -1067,7 +1104,7 @@ python3 main.py
 
 ### 5.C Snake
 
-- [ ] Queue ohne 180°-Selbstkill, Wachstum, Speed-up, Wand = Tod, Kopf = Logo.
+- [ ] Queue ohne 180°-Selbstkill, Wachstum, Speed-up, Wand = Tod, Kopf = Logo, Food = MS-Mark.
 
 ### 5.D Bubble Shot
 
@@ -1101,5 +1138,6 @@ python3 main.py
 10. Ist die Operator-Kombo nirgends im HUD oder in der README erklärt?
 11. Startet die systemd-Unit das Spiel nach einem Crash von selbst neu?
 12. Ist CHAOS in jedem Titel der einzige Held? Tragen Gegner nirgends das Logo? Haben nur DK und Frogger Strichgliedmaßen?
+13. Sitzt `draw_ms_mark` (Vier-Quadrat + ggf. `MICROSOFT`) in jedem der sieben Spiele, nicht nur bei DK?
 
 Ende des Master-Prompts. Dieses Dokument ist die einzige Wahrheitsquelle für die Code-Generierung.
