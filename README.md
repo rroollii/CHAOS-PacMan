@@ -11,16 +11,25 @@ Die komplette Raspberry-Pi-5-Installation (OS flashen, Display, Bluetooth, syste
 
 ## Lokal starten
 
-Python 3.11+ und eine grafische Sitzung:
+Python 3.11+ und eine grafische Sitzung. Auf dem Mac mit Python 3.14 das venv **neu** anlegen (altes `.venv` ohne pygame-ce löschen):
 
 ```bash
+cd /Users/rolandkremnitzer/CHAOS-Lokal/CHAOS_PacMan
+rm -rf .venv
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 CHAOS_WINDOWED=1 python3 main.py
 ```
 
-Ohne Fenster-Variable startet das Spiel im Vollbild. Der Mauszeiger bleibt aus.
+`pygame` (classic) hat unter Python 3.14 kein Mac-Wheel. Die Abhängigkeit ist deshalb `pygame-ce` — derselbe `import pygame`.
+
+Ohne `CHAOS_WINDOWED=1` startet das Spiel im Vollbild. Der Mauszeiger bleibt aus. Wenn cairosvg scheitert, reicht:
+
+```bash
+pip install pygame-ce pillow
+CHAOS_WINDOWED=1 python3 main.py
+```
 
 | Taste | Funktion |
 |---|---|

@@ -11,7 +11,7 @@ SERVICE_PATH="/etc/systemd/system/chaos-arcade.service"
 echo "[setup] Installing system packages…"
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-  python3 python3-venv python3-pip python3-pygame \
+  python3 python3-venv python3-pip \
   libcairo2 libcairo2-dev libgdk-pixbuf-2.0-0 libffi-dev \
   libxml2 libpango-1.0-0 shared-mime-info \
   fonts-dejavu-core \
