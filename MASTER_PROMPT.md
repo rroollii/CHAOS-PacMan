@@ -6,7 +6,7 @@
 **Zielplattform:** Raspberry Pi 5 (64-bit Raspberry Pi OS)  
 **Stack:** Python 3.11+ / Pygame 2  
 **Eingabe:** 8BitDo DIY Kit (Bluetooth Arcade-Stick) + Tastatur-Pfeiltasten  
-**Spieler-Asset:** `assets/logo.svg` (Firmenlogo, Vektor) — **in jedem Spiel** die Spielfigur  
+**Spieler-Assets:** `assets/logo_face.svg`, `assets/logo_mark.svg`, `assets/logo_badge.svg` — das CHAOS-Logo ist **in jedem Spiel der einzige Held**  
 **Betriebsart:** Unbeaufsichtigtes Messe-Kiosk am digitalen Pult  
 **Öffentliche Bedienung:** nur das **freigeschaltete** Spiel starten/spielen — kein öffentlicher Spielwechsel  
 **Operator-Spielwechsel:** nur über versteckte Tastenkombination (siehe 2.3.5)  
@@ -28,7 +28,7 @@ Bewusst **nicht** im Katalog (auch nicht als späterer Nachzug): Tetris-Klone (M
 
 Dieses Dokument ist verbindlich. CHAOS Arcade ist **kein** reiner Pac-Man-Klon. Pac-Man ist das **erste** Spiel im Kabinett und der **Default** nach Erststart, nicht das einzige. Es gibt genau **sieben** Titel. Besucher spielen immer nur das vom Operator freigeschaltete Spiel. Jede nachfolgende Implementierung muss sich **wortgetreu** an diese Vorgaben halten. Abweichungen sind nur zulässig, wenn sie einen Laufzeitfehler auf dem Raspberry Pi 5 verhindern — und müssen dann im Code kommentiert werden.
 
-Rechtlicher Rahmen: Es werden **keine** originalen ROM-Assets, Sprites, Melodien oder Markenzeichen Dritter eingebettet. Mechanik und Feeling dürfen anklingen; visuelle Identität ist ausschließlich CHAOS (Logo + Neon-Palette).
+Rechtlicher Rahmen: Es werden **keine** originalen ROM-Assets, Sprites, Melodien oder Markenzeichen Dritter eingebettet — auch **keine** Microsoft-/Office-/Windows-/Azure-Bildmarken und keine Produktnamen wie E3, E5, M365. Mechanik und Feeling der Arcade-Vorbilder dürfen anklingen; Gegner und Welt sind **Lizenzchaos** (Audit, Shelfware, True-up, SKU, Lock-in, Renewal). Visuelle Identität des Helden ist ausschließlich das CHAOS-Logo.
 
 ---
 
@@ -44,7 +44,8 @@ CHAOS Arcade ist ein **Multi-Game-Mitmach-Kabinett mit gesperrtem Titel**. Ein M
 - Jedes der sieben Spiele muss **allein mit Stick + einem Action-Button** bedienbar sein. Namenseingabe ebenfalls nur mit Stick + Action/Start.
 - Median-Runde eines Erstspielers: **45–75 s** bis GAME_OVER. Zu schwer → Tempo/Dichte senken, keine Tutorials. Zu leicht → nur über Level nachziehen, nicht über neue Tasten.
 - Typische Runde: **30–90 Sekunden**. Kein Spiel darf eine Einarbeitungszeit > 3 Sekunden brauchen.
-- Das Firmenlogo ist in **allen** Spielen der Avatar (Mund/Kopf, Kletterer, Schlangenkopf, Kanone/Kugel, Springer).
+- Das CHAOS-Logo ist in **allen** Spielen der **Held**. Es gibt keinen zweiten Spieler-Sprite. Braucht die Bewegung Beine oder Arme, sind das **Strichmännchen-Gliedmaßen** unter/neben dem Logo (siehe 1.7) — kein gezeichneter Körper, keine Schuhe, kein Nintendo-Kletterer.
+- Gegner sind Lizenzchaos-Primitive (siehe 0.7). Sie tragen **niemals** das CHAOS-Logo.
 - Solange **nicht** gespielt wird (`GAME_SELECT`, `ATTRACT_MODE`, `GAME_OVER`, `NAME_ENTRY`), ist die **Top-10 des aktuellen Spiels** sichtbar — mit Rang, Name, Score.
 
 ### 0.2 Hardware-Annahmen
@@ -74,7 +75,7 @@ CHAOS Arcade ist ein **Multi-Game-Mitmach-Kabinett mit gesperrtem Titel**. Ein M
 - Keine Magic Numbers ohne benannte Konstanten (`config.py` + optional `games/<id>/constants.py`).
 - Keine Netzwerkzugriffe, keine Telemetrie.
 - UTF-8, Linux-Zeilenenden.
-- Lauffähig **ohne** `logo.svg` (Fallback-Renderer ist Pflicht).
+- Lauffähig **ohne** die drei Logo-SVGs (Fallback-Renderer je Variante ist Pflicht).
 - Jedes Spiel implementiert dasselbe `GameMode`-Protokoll. Keine Sonderwege für Pac-Man.
 
 ### 0.5 Verbindliche Dateistruktur
@@ -115,7 +116,9 @@ CHAOS_PacMan/
 │       └── mode.py         # BreakoutMode(GameMode)
 ├── attract.py              # Demo nur des featured Game; keine Titelrotation
 ├── assets/
-│   └── logo.svg            # Firmenlogo (kann fehlen)
+│   ├── logo_face.svg       # Gesicht: Rauten-Augen + Lächeln (kann fehlen)
+│   ├── logo_mark.svg       # Grünes C + Gesicht (kann fehlen)
+│   └── logo_badge.svg      # Hex-Badge + C + Gesicht (kann fehlen)
 ├── data/
 │   ├── highscores.json     # wird zur Laufzeit erzeugt
 │   └── cabinet.json        # featured GameId; wird zur Laufzeit erzeugt
@@ -126,7 +129,7 @@ CHAOS_PacMan/
 └── README.md
 ```
 
-Die erste Auslieferung darf alles in `main.py` vereinen, **muss** aber `GameId`, `GameMode`, `CabinetStore`, `HighscoreStore`, `StateId.NAME_ENTRY` und die sieben Mode-Klassen (`PacmanMode`, `DonkeyKongMode`, `SnakeMode`, `BubbleShotMode`, `FroggerMode`, `InvadersMode`, `BreakoutMode`) namentlich enthalten.
+Die erste Auslieferung darf alles in `main.py` vereinen, **muss** aber `GameId`, `GameMode`, `LogoKind`, `CabinetStore`, `HighscoreStore`, `draw_stick_hero`, `StateId.NAME_ENTRY` und die sieben Mode-Klassen (`PacmanMode`, `DonkeyKongMode`, `SnakeMode`, `BubbleShotMode`, `FroggerMode`, `InvadersMode`, `BreakoutMode`) namentlich enthalten.
 
 ### 0.6 Visuelle Identität (Arcade / CHAOS)
 
@@ -136,9 +139,10 @@ Shared:
 - HUD: monospace, hoher Kontrast, große Zahlen (Lesbarkeit ab 1,5 m).
 - Akzent: neon-cyan `#2DE2E6`, Warmweiß `#F4F1EA`, Bernstein `#FFB703`.
 - Gefahr: `#FF3B3B`. Support: `#FF7AD9`, `#3BD1FF`, `#FF9F1C`.
-- Kein Comic-Pac-Man-, kein Nintendo-, kein Konami-Sprite. Der Spieler **ist** das Firmenlogo.
+- Kein Comic-Pac-Man-, kein Nintendo-, kein Konami-Sprite. Der Held **ist** das CHAOS-Logo, plus höchstens Strichbein/-arm.
+- CHAOS-Grün der Marke (Rauten-Augen / C-Kontur) darf zusätzlich zur Neon-Palette verwendet werden; Fallback-Näherung `#7CFF3A`.
 
-Akzente pro Spiel (nur Level-Geometrie, nicht das Logo):
+Akzente pro Spiel (nur Level-Geometrie und Gegner, nicht das Logo):
 
 | Game | Primärakzent | Level-Look |
 |---|---|---|
@@ -148,7 +152,48 @@ Akzente pro Spiel (nur Level-Geometrie, nicht das Logo):
 | BUBBLE_SHOT | `#3BD1FF` | Kugelfarben aus der CHAOS-Palette |
 | FROGGER | `#3BD1FF` / `#FF3B3B` | Straße dunkel, Wasser cyan-dunkel, Ziele bernstein |
 | INVADERS | `#FF7AD9` | Sternenfeld, Formation pink/cyan, Schüsse bernstein |
-| BREAKOUT | `#FFB703` | Steinreihen in der CHAOS-Palette, Schläger cyan |
+| BREAKOUT | `#FFB703` | Steinreihen = Lock-in-Klauseln, Schläger cyan |
+
+### 0.7 Held und Gegnerwelt (Lizenzchaos)
+
+Der Held heißt in der Fiktion **CHAOS**, der Optimizer. Er räumt Lizenzchaos auf. HUD bleibt bei `SCORE` (kein „€ eingespart“).
+
+**Drei Logo-Varianten, eine Figur:**
+
+| Datei | Name | Motiv | Pflicht-Einsatz |
+|---|---|---|---|
+| `logo_face.svg` | FACE | Neon-grüne Rauten-Augen, weißes Lächeln | Kleine Tiles, Kopf, Ball, Schiffskern |
+| `logo_mark.svg` | MARK | Grünes Sechseck-C, Gesicht innen | Held mit „Körper“-Silhouette: Kanone, Schläger, Kletter-Torso |
+| `logo_badge.svg` | BADGE | Weißes Hex, schwarzes C, Gesicht | Idle, Attract-Titel, Game Over, Highscore-Highlight |
+
+Gegner-Cast (überall dieselben, nur Primitive, **ohne** CHAOS-Logo):
+
+| Figur | Look | Rolle |
+|---|---|---|
+| `AUDITOR` | Rotes Klemmbrett + Monokel | Aggressiver Jäger |
+| `TRUEUP` | Orangerote Rechnungsrolle | Druck, Wellen, rollende Fässer |
+| `SHELFWARE` | Verstaubter grauer Schlüssel/Karton | Langsam, wertvoll |
+| `SKUWIRR` | Bunter Etikettenstapel | Unberechenbar |
+| `LOCKIN` | Dunkles Schloss-Rechteck | Wand, 2-Hit-Stein, Rand |
+| `RENEWAL` | Kalender auf Rädern | Fahrzeuge, rollende Hazard |
+| `NOTICE` | Papierflieger / Briefbombe | Gegner-Projektile |
+| `KLAUSEL` | Kleingedruckt-Ziegel | Invaders-Reihen, Breakout-Steine |
+| `AE` | Fliegende Aktentasche | Bonus-UFO |
+| `TENANT` | Wolken-Floß | Frogger-Fluss |
+
+Idle-Mechanikzeile (deutsch, max. 28 Zeichen):
+
+| Game | Zeile |
+|---|---|
+| PACMAN | `ISS DAS SHELFWARE` |
+| DONKEY_KONG | `KLIMM ZUM VERTRAG` |
+| SNAKE | `FRISS UNGENUTZTE SEATS` |
+| BUBBLE_SHOT | `SORTIER DIE SKUS` |
+| FROGGER | `QUER DURCHS RENEWAL` |
+| INVADERS | `SCHIESS DEN AUDIT AB` |
+| BREAKOUT | `BRICH DEN LOCK-IN` |
+
+SKU-Typen auf dem Screen nur als Gattung: `BASIS`, `PREMIUM`, `FRONTLINE`, `ADDON`, `SANDBOX`. Keine Microsoft-Produktnamen.
 
 ---
 
@@ -156,20 +201,24 @@ Akzente pro Spiel (nur Level-Geometrie, nicht das Logo):
 
 ### 1.1 Quelle und Verträge
 
-- Primärpfad: `assets/logo.svg`.
-- Das SVG gilt als **quadratisch normiert**. Nicht-quadratische ViewBox: proportional fitten, zentrieren, niemals strecken.
-- Mehrere Rastergrößen, **einmal** beim Boot cachen:
+Enum `LogoKind = FACE | MARK | BADGE`.  
+`LogoAsset.load(kind: LogoKind, path: Path, size: int) -> pygame.Surface`.
 
-| Cache-Key | Größe | Verwendung |
-|---|---|---|
-| `logo_hero` | 160 | SELECT / Titel |
-| `logo_tile` | `TILE_SIZE - 4` (Default 28) | Pac-Man, Snake-Kopf, Frogger |
-| `logo_dk` | 36 | Donkey-Kong-Kletterer |
-| `logo_cannon` | 48 | Bubble-Shot-Kanone |
-| `logo_bubble` | 28 | Bubble-Shot-Kugel, Breakout-Ball (getintet) |
-| `logo_snake_body` | 24 | Snake-Körper (getintet, 70 % Alpha) |
-| `logo_ship` | 36 | Invaders-Kanone, Facing UP |
-| `logo_paddle` | 40 | Breakout: zentriert auf dem Schläger-Rect, nicht strecken |
+Jedes SVG gilt als **quadratisch normiert**. Nicht-quadratische ViewBox: proportional fitten, zentrieren, niemals strecken.
+
+Rastergrößen, **einmal** beim Boot cachen (`(kind, size)`):
+
+| Cache-Key | Kind | Größe | Verwendung |
+|---|---|---|---|
+| `logo_hero` | BADGE | 160 | SELECT / Titel / GAME OVER |
+| `logo_tile` | FACE | `TILE_SIZE - 4` (Default 28) | Pac-Man, Snake-Kopf, Frogger-Kopf |
+| `logo_dk` | MARK | 36 | Donkey-Kong-Torso (Beine/Arme = Strich, 1.7) |
+| `logo_cannon` | MARK | 48 | Bubble-Shot-Kanone |
+| `logo_bubble` | FACE | 28 | Bubble-Kugel, Breakout-Ball (getintet) |
+| `logo_snake_body` | FACE | 24 | Snake-Körper (getintet, 70 % Alpha) |
+| `logo_ship` | MARK | 36 | Invaders, Facing UP, keine Beine |
+| `logo_paddle` | MARK | 40 | Breakout, zentriert auf dem Schläger-Rect |
+| `logo_nest` | FACE | 20 | Frogger-Nest gefüllt |
 
 `TILE_SIZE = 32` bleibt die Shared-Grid-Basis. Einzelne Games dürfen eigene Zellengrößen nutzen, beziehen sie aber aus `config.py`.
 
@@ -194,14 +243,18 @@ Zusätzlich quadratisch zentrieren:
 
 **Stufe B — pygame / SDL_image**, bei Exception weiter zu Stufe C.
 
-**Stufe C — geometrischer Fallback** `render_fallback_logo(size)`:
+**Stufe C — geometrischer Fallback** `render_fallback_logo(kind, size)` — ahmt die echte Marke nach, kein Pac-Man-Kuchen:
 
-- Kreis-Körper, Radius `size * 0.46`, Fill `#F4F1EA`, Outline `#2DE2E6`.
-- Polygon-Fächer (36 Segmente), Mundwinkel ±28° offen.
-- Zwei Orbit-Dreiecke (10 Uhr / 2 Uhr) in Cyan.
-- Ein Auge oberhalb der Mundmitte.
+Gemeinsames Gesicht (FACE-Kern):
 
-`LogoAsset.load` wirft **keine** Exception nach außen.
+- Zwei Rauten-Augen, Fill `#7CFF3A`, Breite `size * 0.16`, Abstand der Mittelpunkte `size * 0.28`, sitzen im oberen Drittel.
+- Lächeln: weiße Linse/Bogen, Stroke `size * 0.07`, Öffnung nach oben, Breite `size * 0.42`.
+
+MARK zusätzlich: Sechseck-C, Stroke `#7CFF3A`, Dicke `size * 0.10`, Öffnung nach **rechts**, Gesicht zentriert in der Öffnung.
+
+BADGE zusätzlich: äußeres weißes Sechseck-Fill, darin schwarzes C wie MARK, Gesicht mit grünen Augen und dunklem Lächeln.
+
+`LogoAsset.load` wirft **keine** Exception nach außen. Fehlt eine Datei, fällt nur diese Variante auf Stufe C, die anderen bleiben geladen.
 
 ### 1.3 Richtungs-Transformation
 
@@ -215,30 +268,61 @@ Einmal vier Richtungs-Surfaces pro Größe cachen. Basis: Logo schaut nach **rec
 | DOWN | `rotate(base, -90)` + `_fit_square` |
 
 - Niemals `rotozoom` pro Frame, niemals SVG neu parsen.
-- `tint_surface(surf, color)` einmalig für Snake-Körper, Frightened-Geister, Bubble-Farben, Breakout-Ball.
+- `tint_surface(surf, color)` einmalig für Snake-Körper, Bubble-Farben, Breakout-Ball. Gegner werden **nicht** aus dem Logo getintet.
 
 ### 1.4 Nutzungsregeln pro Spiel
 
-| Game | Logo-Nutzung |
-|---|---|
-| PACMAN | `logo_tile` + Facing-Cache, Cyan-Ring nur bei Bewegung |
-| DONKEY_KONG | `logo_dk`, Facing LEFT/RIGHT; UP nur auf Leiter (kein DOWN-Flip auf den Kopf — auf Leitern Facing unverändert oder leicht 0°) |
-| SNAKE | Kopf = `logo_tile[facing]`; Körper = `logo_snake_body` getintet `#2DE2E6` |
-| BUBBLE_SHOT | Kanone = `logo_cannon` rotiert auf **diskrete Winkelschritte** (gecachte 2°-Raster-Surfaces, 0…180° bzw. −80…+80); fliegende Kugel = `logo_bubble` getintet in Schussfarbe |
-| FROGGER | `logo_tile[facing]`; Idle schaut UP |
-| INVADERS | `logo_ship` fest Facing UP; Schüsse = Primitive |
-| BREAKOUT | Schläger-Rect + `logo_paddle` mittig; Ball = `logo_bubble` |
+| Game | Logo (Held) | Gliedmaßen |
+|---|---|---|
+| PACMAN | `logo_tile` FACE + Facing-Cache | keine — schwebt |
+| DONKEY_KONG | `logo_dk` MARK, Facing L/R; auf Leiter kein Kopfstand | **Strichbeine + Stricharme** (1.7), immer |
+| SNAKE | Kopf FACE; Körper FACE getintet `#2DE2E6` | keine |
+| BUBBLE_SHOT | Kanone MARK, 2°-Winkel-Cache; Kugel FACE getintet | keine |
+| FROGGER | `logo_tile` FACE, Idle UP | **Strichbeine**, 2-Frame-Hop |
+| INVADERS | `logo_ship` MARK, Facing UP | keine — fliegt |
+| BREAKOUT | Schläger MARK mittig; Ball FACE | keine |
 
 Bubble-Shot-Rotation: Winkel-Cache beim Start in 2°-Schritten, **kein** per-frame `rotozoom` auf das SVG.
+
+Das Logo darf **nicht** als Boss, Geist, Fass, Auto, Invader oder Stein erscheinen. Nur der vom Spieler gesteuerte Held (plus seine eigenen Projektile/Körpersegmente/Nest-Markierung).
 
 ### 1.5 Logging
 
 ```
-[assets] SVG loaded via cairosvg: assets/logo.svg
-[assets] SVG load failed (...), using fallback geometry
+[assets] FACE loaded via cairosvg: assets/logo_face.svg
+[assets] MARK load failed (...), using fallback geometry
 ```
 
-### 1.6 Abhängigkeiten
+### 1.7 Strichmännchen-Gliedmaßen
+
+Funktion `draw_stick_hero(surf, logo_surf, anchor, facing, pose) -> None`.
+
+Das Logo bleibt Kopf **und** Torso. Striche sind nur Arme und Beine, zur Laufzeit gezeichnet (nicht ins SVG einbrennen — sonst kein Walk-Cycle).
+
+```
+STICK_COLOR = #2DE2E6
+STICK_WIDTH = 3          # 2 px unter size 28
+LEG_LEN = logo_h * 0.55
+ARM_LEN = logo_h * 0.45
+```
+
+| `pose` | Beine | Arme |
+|---|---|---|
+| `IDLE` | beide senkrecht, 8° gespreizt | am Körper, 15° |
+| `WALK_A` / `WALK_B` | im Wechsel ±28° (2 Frames, 8 Hz am Boden) | gegenläufig ±20° |
+| `JUMP` | beide leicht nach hinten 25° | beide nach vorn 30° |
+| `CLIMB` | gestaffelt ±18° vertikal | nach oben an die Leiter, 70° |
+| `HOP` | beide nach hinten 40° für 80 ms, dann IDLE | optional kurz nach vorn |
+
+Regeln:
+
+- Ansatz Beine: Unterkante-Mitte des Logo-Rects. Ansatz Arme: linke/rechte Seitenmitte.
+- Keine Füße, keine Hände, keine Gelenkkugeln größer als 3 px.
+- Kein zweiter Kopf, kein Strich-Rumpf durch das Logo.
+- Logo niemals auf den Kopf drehen, um „Beine oben“ zu simulieren.
+- Nur DK und Frogger rufen `draw_stick_hero` auf. Alle anderen Spiele: nur Logo.
+
+### 1.8 Abhängigkeiten
 
 Python: `cairosvg`, `cairocffi`, `cssselect2`, `tinycss2`, `defusedxml`, `pillow`, `pygame`.  
 System (Pi): `libcairo2`, `libcairo2-dev`, `libgdk-pixbuf-2.0-0`, `libffi-dev`, `libxml2`, `libpango-1.0-0`, `shared-mime-info`.  
@@ -307,7 +391,7 @@ Kein Carousel. Keine Nachbar-Spiele. Kein `◀ WÄHLEN ▶`.
 Layout (1280×720):
 
 - Oben: Logo 160 px + `CHAOS ARCADE` + UI-Titel des **featured** Game (z. B. `PAC-MAN`).
-- Eine Zeile Mechanik des featured Game (deutsch, max. 28 Zeichen).
+- Eine Zeile Mechanik des featured Game — verbindlich die Tabelle in 0.7.
 - Mitte/rechts: **Top-10-Tafel** dieses Spiels (Pflicht, siehe 2.3.6). Leere Plätze als `---  --------    000000`.
 - Unten blinkend: `START SPIELEN` — kein Hinweis auf andere Titel, keine Pfeile.
 
@@ -592,12 +676,13 @@ Gemeinsam:
 - Interne Szene unter dem 80-px-HUD, optional 96-px-Fußzeile mit `CHAOS` + Kurzsteuerung.
 - 3 Leben, sofern das Spiel Leben hat (Snake: 1 Leben / Sofort-Out, dann GAME_OVER — siehe 3.C). Invaders und Breakout: 3 Leben.
 - Level-Steigerung erhöht Tempo oder Dichte, nie die Steuerung umbauen.
+- Held = CHAOS-Logo (± Strichgliedmaßen). Gegner = Lizenzchaos-Cast aus 0.7, nie das Logo.
 
 ---
 
 ### 3.A PACMAN
 
-Entspricht dem bisherigen Pac-Man-Vertrag. Kurzfassung der bindenden Regeln; Implementierung muss sie vollständig erfüllen.
+Vertragsflure statt Geisterhaus-Märchen: CHAOS frisst ungenutzte Seats (`Dots`), Optimize (`Power`) macht Auditoren kurz `COMPLIANT`. KI und Zahlen bleiben der Pac-Man-Vertrag.
 
 #### 3.A.1 Grid
 
@@ -626,24 +711,33 @@ Target-Distanz euklidisch, Tie-Break UP/LEFT/DOWN/RIGHT.
 Blinky = Player-Tile (Elroy-light ab < 20 Dots). Pinky = 4 vor Facing. Inky = Punktspiegelung über 2 vor Player. Clyde = Player wenn Distanz > 8, sonst Scatter-Ecke.  
 Scatter-Timer Level 1: 7/20/7/20/5/∞. Ab Level 3: 5/20/5/∞.  
 Leave-Staffel 0.2 / 0.8 / 2.4 / 4.0 s.  
-Zeichnung: Pygame-Primitives, keine SVG-Geister.
+Zeichnung: Pygame-Primitives, **kein** CHAOS-Logo.
+
+| KI-Name | Sichtname | Look |
+|---|---|---|
+| BLINKY | AUDITOR | rotes Klemmbrett, Monokel |
+| PINKY | TRUEUP | orangerote Rechnungsrolle |
+| INKY | SKUWIRR | Etikettenstapel, CHAOS-Palette |
+| CLYDE | SHELFWARE | grauer Schlüsselkarton |
+
+FRIGHTENED = `COMPLIANT`: cyan, flieht. EATEN = leeres Klemmbrett-Augenpaar zur Basis.
 
 #### 3.A.5 Player
 
-3 Leben, INVULN 2.0 s nach Respawn. Kollision Kreis-Radius `TILE_SIZE * 0.35`. Logo-Facing-Cache.
+3 Leben, INVULN 2.0 s nach Respawn. Kollision Kreis-Radius `TILE_SIZE * 0.35`. FACE-Logo, Facing-Cache, **keine** Beine.
 
 ---
 
 ### 3.B DONKEY KONG
 
-Messe-Plattformer, **eine** kompakte Baustellen-Szene (kein 4-Board-Original). Gefühl: unten starten, oben Ziel, Fässer weichen, Leitern nutzen, springen.
+Messe-Plattformer, **eine** kompakte Vertragsturm-Szene (kein 4-Board-Original). Gefühl: unten starten, oben Optimierungs-Siegel, True-up-Rollen weichen, Leitern nutzen, springen. Held = MARK-Logo auf Strichbeinen.
 
 #### 3.B.1 Bühne
 
 - 6 horizontale Träger (Girders), leicht gegenläufig geneigt (±4° optisch, Kollision als Achsen-Segmente).
 - Pro Träger 1–2 Leitern, die den nächsthöheren Träger verbinden. Mindestens ein durchgehender Pfad nach oben.
-- Oben links oder mitte: Boss-Platzhalter `KongActor` (rechteckiger Primitive-Körper + getintes Logo 64 px, **nicht** als Player steuerbar).
-- Oben rechts: Ziel `GOAL` (Flagge/Portal, bernstein). Berühren = Level-Clear + 500 Punkte + nächste, schnellere Runde.
+- Oben links oder mitte: Boss `ContractActor` — **ENTERPRISE-VERTRAG**, Primitive (breiter Aktenblock + zwei Siegel-Kreise). **Kein** CHAOS-Logo, nicht steuerbar.
+- Oben rechts: Ziel `GOAL` (Optimierungs-Siegel, bernstein). Berühren = Level-Clear + 500 Punkte + nächste, schnellere Runde.
 - Unten: Player-Spawn.
 
 Interne Playfield-Größe: 960×560, zentriert unter HUD.
@@ -654,23 +748,23 @@ Interne Playfield-Größe: 960×560, zentriert unter HUD.
 - Sprung: Edge-Action, nur wenn `grounded`. `jump_v = -620` px/s.
 - Leiter: wenn `dy < 0` und Overlap mit Leiter-Rect ≥ 40 % der Spielerbreite → Climb-State, 140 px/s vertikal, Gravitation aus. `dy > 0` steigt herab. Horizontal auf Leiter gedämpft (0).
 - Kein Double-Jump, kein Luft-Steuern über 35 % der Boden-Speed hinaus.
-- Träger-Kollision: Füße gegen Oberkante. Durch Leiternlöcher darf der Spieler fallen, wenn nicht im Climb-State.
+- Träger-Kollision: Strichfüße gegen Oberkante. Durch Leiternlöcher darf der Spieler fallen, wenn nicht im Climb-State.
 
 #### 3.B.3 Fässer und Gefahr
 
-- `KongActor` wirft alle `BARREL_INTERVAL` (1.6 s Level 1, −0.12 s/Level, min 0.7 s) ein Fass.
-- Fässer folgen Trägern (rollen in Neigungsrichtung), fallen am Ende eine Ebene tiefer, despawnen unten.
-- 15 % Chance: Fass wird zum **Fallfass** (vertikal, schneller) — telegraphiert durch kürzeres Sprite.
-- Kollision Spieler/Fass: Kreis-Kreis, außer während Sprung **über** das Fass (Spieler-Fuß y < Fass-Oberkante − 4 px) → +100 Punkte, kein Schaden.
+- `ContractActor` wirft alle `BARREL_INTERVAL` (1.6 s Level 1, −0.12 s/Level, min 0.7 s) eine **TRUEUP-Rolle**.
+- Rollen folgen Trägern (rollen in Neigungsrichtung), fallen am Ende eine Ebene tiefer, despawnen unten.
+- 15 % Chance: Rolle wird zum **Fall-Notice** (vertikal, schneller) — telegraphiert durch kürzeres Rect.
+- Kollision Spieler/Rolle: Kreis-Kreis, außer während Sprung **über** die Rolle (Strichfuß-y < Rollen-Oberkante − 4 px) → +100 Punkte, kein Schaden.
 - 3 Leben. Tod: Freeze 1.2 s, Respawn unten. 0 Leben → GAME_OVER.
-- Optional ab Level 2: ein Feuergeist auf dem untersten Träger, KI = läuft auf den Spieler zu, kehrt an Leiter/Rand um. Primitive-Zeichnung.
+- Optional ab Level 2: ein `AUDITOR` auf dem untersten Träger, KI = läuft auf den Spieler zu, kehrt an Leiter/Rand um. Primitive, kein Logo.
 
 #### 3.B.4 Steuerung und Logo
 
-- LEFT/RIGHT: Facing + Lauf.
-- UP/DOWN: Leiter.
-- Action: Sprung.
-- Logo nicht auf den Kopf drehen. Auf Leitern: letztes L/R-Facing behalten.
+- LEFT/RIGHT: Facing + Lauf, Pose `WALK_A`/`WALK_B`.
+- UP/DOWN: Leiter, Pose `CLIMB`.
+- Action: Sprung, Pose `JUMP`.
+- `draw_stick_hero` jedes Frame. Logo nicht auf den Kopf drehen. Auf Leitern: letztes L/R-Facing behalten.
 
 #### 3.B.5 Scoring
 
@@ -715,9 +809,9 @@ Feld zentriert unter HUD, 1-Tile-Rand als Wand (sichtbar cyan). Kein Wrap — Wa
 
 #### 3.C.4 Darstellung
 
-- Kopf: `logo_tile[facing]`.
-- Körper: Kette `logo_snake_body`, Alpha 220 → 90 zum Schwanz.
-- Food pulsiert 2 Hz in der Größe ±8 %.
+- Kopf: FACE `logo_tile[facing]`, keine Beine.
+- Körper: Kette FACE `logo_snake_body`, Alpha 220 → 90 zum Schwanz.
+- Food: `SHELFWARE`-Token (grauer Schlüssel-Rect oder Mini-FACE getintet bernstein), pulsiert 2 Hz ±8 %.
 
 ---
 
@@ -728,9 +822,9 @@ Aim-and-match, Puzzle-Bobble-Feeling, CHAOS-Farben. Kein originaler Bobble-Sprit
 #### 3.D.1 Spielfeld
 
 - Hex- oder Offset-Row-Grid: `BUBBLE_COLS = 10`, sichtbare Reihen max. 12, Kugel-Durchmesser 36 px.
-- Decke fest. Neue Reihe schiebt alle `CEILING_EVERY_SHOTS = 6` Schüsse nach unten (Level 1), ab Level 3 alle 5, ab Level 5 alle 4.
-- Bodenlinie 80 px über dem Fußbereich: berührt eine Kugel die Linie → GAME_OVER (nach kurzem Flash).
-- Kanone mittig unten. Logo als Kanonenkopf, Lauf = cyan Rechteck.
+- Decke fest (jährlicher True-up). Neue Reihe schiebt alle `CEILING_EVERY_SHOTS = 6` Schüsse nach unten (Level 1), ab Level 3 alle 5, ab Level 5 alle 4.
+- Bodenlinie 80 px über dem Fußbereich (Budget-Boden): berührt eine Kugel die Linie → GAME_OVER (nach kurzem Flash).
+- Kanone mittig unten. Held = MARK-Logo als Kanonenkopf, Lauf = cyan Rechteck. Keine Beine.
 
 #### 3.D.2 Zielen und Schuss
 
@@ -742,9 +836,15 @@ Aim-and-match, Puzzle-Bobble-Feeling, CHAOS-Farben. Kein originaler Bobble-Sprit
 
 #### 3.D.3 Farben und Match
 
-Farben (max. 4 auf Level 1, 5 ab Level 3):
+Farben = SKU-Gattungen (max. 4 auf Level 1, 5 ab Level 3), ohne Microsoft-Namen:
 
-`#2DE2E6`, `#FF3B3B`, `#FF7AD9`, `#FFB703`, `#3BD1FF`
+| Farbe | Gattung |
+|---|---|
+| `#2DE2E6` | BASIS |
+| `#FF3B3B` | PREMIUM |
+| `#FF7AD9` | FRONTLINE |
+| `#FFB703` | ADDON |
+| `#3BD1FF` | SANDBOX |
 
 - Snap: nächster freier Grid-Slot am Kontaktpunkt.
 - Nach Snap: Flood-Fill gleiche Farbe. ≥ 3 → entfernen, +50 pro Kugel.
@@ -768,7 +868,7 @@ Farben (max. 4 auf Level 1, 5 ab Level 3):
 
 ### 3.E FROGGER
 
-Raster-Queren: Straße, Mittelstreifen, Fluss, 5 Nester.
+Raster-Queren durchs Renewal: Straße, Mittelstreifen, Cloud-Fluss, 5 Kostenstellen. Held = FACE-Logo auf Strichbeinen.
 
 #### 3.E.1 Layout (13 Reihen × 15 Spalten)
 
@@ -779,7 +879,7 @@ Von unten nach oben:
 5. Safe Median  
 6–9. Wasser: 4 Lanes, Holz/Schildkröten  
 10. Bank  
-11. 5 Nester (`HOME`), getrennt durch Mauern  
+11. 5 Nester (`HOME` / Kostenstellen), getrennt durch Mauern  
 12. (oben, dekorativ)
 
 `FROG_TILE = 40` → 15×40 = 600 px breit, 13×40 = 520 px hoch, zentriert.
@@ -795,8 +895,8 @@ Von unten nach oben:
 #### 3.E.3 Hazard-Bewegung
 
 - Jede Lane hat eigene Speed und Richtung, gegenläufig benachbart.
-- Autos: 2–3 Rects, Lücken immer ≥ 2 Tiles bei Level 1.
-- Fluss: Logs 2–4 Tiles lang; Schildkröten können ab Level 2 alle 3 s für 1.0 s tauchen.
+- Autos = `RENEWAL` (Kalender-Rects), 2–3 Stück, Lücken immer ≥ 2 Tiles bei Level 1.
+- Fluss: `TENANT`-Flöße 2–4 Tiles; ab Level 2 tauchen abgekündigte SKUs alle 3 s für 1.0 s.
 - Spieler auf Floater erbt `vx` der Lane (pixelgenau zwischen Hops, gerastert beim nächsten Hop).
 - Wrap: Hazards verlassen links und kommen rechts wieder (und umgekehrt).
 - Level+1 wenn alle 5 Nester gefüllt: Speeds `* 1.12`, eine zusätzliche Auto-Lane-Dichte, Timer härter.
@@ -809,16 +909,16 @@ Von unten nach oben:
 
 #### 3.E.5 Darstellung
 
-- Player: `logo_tile[facing]`.
-- Autos: Neon-Rechtecke (rot/pink), keine Sprite-Roms.
-- Logs: dunkles Cyan-Braun-Rechteck.
-- Nester: bernstein-Mulde; gefüllt = Mini-Logo 20 px.
+- Player: FACE `logo_tile[facing]` plus `draw_stick_hero(..., HOP|IDLE)` — Beine beim Hop 80 ms nach hinten.
+- Autos: `RENEWAL`-Kalender, neon-rot/pink, keine Sprite-Roms.
+- Flöße: `TENANT`, dunkles Cyan-Braun-Rechteck.
+- Nester: bernstein-Mulde; gefüllt = FACE `logo_nest` 20 px (Held sitzt, keine Beine im Nest).
 
 ---
 
 ### 3.F INVADERS
 
-Messe-Shmup: eine Formation, schießen, Wellen. Gefühl Space Invaders, keine originalen Sprite-Roms, keine Galaga-Challenging-Stage.
+Messe-Shmup: Audit-Welle. Gefühl Space Invaders, keine originalen Sprite-Roms, keine Galaga-Challenging-Stage. Held = MARK-Logo als Schiff, **ohne** Beine.
 
 #### 3.F.1 Feld
 
@@ -830,16 +930,16 @@ Playfield 720×560, zentriert unter dem HUD. 40 px Seitenrand. Spieler-Schiff au
 - Action-Edge: eine Kugel nach oben, 520 px/s. Maximal **eine** eigene Kugel gleichzeitig. Zusätzlicher Cooldown 0.28 s.
 - Treffer durch Bomben oder Kontakt mit Invader: Leben −1, Freeze 1.2 s, INVULN 2.0 s, Formation bleibt.
 - 0 Leben → GAME_OVER.
-- Logo: `logo_ship`, Facing UP fest.
+- Logo: `logo_ship` MARK, Facing UP fest, keine Gliedmaßen. Schüsse = Primitive, nicht das Logo.
 
 #### 3.F.3 Formation
 
 - Level 1: 5 Reihen × 8 Spalten, Zelle 36 px, Abstand 8 px.
-- Farben zeilenweise aus der CHAOS-Palette (unten billig, oben teuer).
+- Farben zeilenweise: unten `SHELFWARE`, dann `ADDON`/`SKUWIRR`, oben `KLAUSEL`/`AUDITOR`.
 - Blockbewegung: 40 px/s Level 1, am Rand umkehren und 12 px sinken. Tempo `* 1.10` je Welle, plus `* 1.04` je getötetem Invader (klassische Beschleunigung).
 - Globaler Bomben-Takt: alle 1.2 s Level 1, −0.08 s/Welle, min 0.45 s. Zufällige lebende untere Kante schießt. Bombe 220 px/s nach unten, Primitive.
 - Unterkante der Formation erreicht Spieler-y → sofort GAME_OVER (alle Restleben verloren).
-- Welle leer: +500, nächste Welle (max. 6 Reihen). UFO optional alle 12 s oben durch, 150 Punkte, 180 px/s, Primitive + Mini-Logo 16 px.
+- Welle leer: +500, nächste Welle (max. 6 Reihen). UFO = `AE` (Aktentasche) alle 12 s oben durch, 150 Punkte, 180 px/s, **nur** Primitive — kein CHAOS-Logo.
 
 #### 3.F.4 Scoring
 
@@ -851,7 +951,7 @@ Playfield 720×560, zentriert unter dem HUD. 40 px Seitenrand. Spieler-Schiff au
 
 #### 3.F.5 Darstellung
 
-- Invader: Rechtecke/Diamanten, 2 px Outline, kein Copyright-Sprite.
+- Invader: Rechtecke/Diamanten als Klemmbrett/Klausel, 2 px Outline, kein Copyright-Sprite, kein Logo.
 - Hintergrund: 40 statische Sterne (einmal generiert, Position + Parallax 8 px — brennt nicht ein).
 - Attract: Schiff pendelt und schießt deterministisch.
 
@@ -859,7 +959,7 @@ Playfield 720×560, zentriert unter dem HUD. 40 px Seitenrand. Spieler-Schiff au
 
 ### 3.G BREAKOUT
 
-Schläger unten, Ball, Steinwand oben. Gefühl Breakout, keine Arkanoid-Powerups, keine ROM-Sprites.
+Schläger unten, Ball, Lock-in-Wand oben. Gefühl Breakout, keine Arkanoid-Powerups, keine ROM-Sprites. Held = MARK auf dem Schläger, FACE als Ball. Keine Beine.
 
 #### 3.G.1 Feld
 
@@ -878,7 +978,7 @@ Playfield 800×560, zentriert. Wände links/rechts/oben 12 px cyan. Unten offen.
 
 - Level 1: 6 Reihen × 10 Spalten, Stein 72×22, Gap 4 px, oberer Offset 24 px.
 - Reihenfarben CHAOS-Palette. Punkte oben → unten: 30 / 25 / 20 / 15 / 10 / 10.
-- Keine unzerstörbaren Steine auf Level 1. Ab Level 2: genau 4 graue 2-Hit-Steine (Outline dick).
+- Keine unzerstörbaren Steine auf Level 1. Ab Level 2: genau 4 graue 2-Hit-`LOCKIN`-Steine (Outline dick, Schloss-Kerbe).
 - Feld leer: +500, nächste Wand (eine Reihe mehr, max. 8; Speed-Reset auf `360 * 1.06^(level-1)`).
 
 #### 3.G.4 Scoring und Leben
@@ -888,7 +988,7 @@ Playfield 800×560, zentriert. Wände links/rechts/oben 12 px cyan. Unten offen.
 
 #### 3.G.5 Darstellung
 
-- Steine: gefüllte Rects + 2 px Outline.
+- Steine: `KLAUSEL`-Rects + 2 px Outline, kein Logo.
 - Attract: Schläger folgt dem Ball deterministisch mit 70 % Speed (darf verlieren und resetten, kein Score).
 
 ---
@@ -911,8 +1011,8 @@ Weitere Regeln:
 
 1. `requirements.txt` + `setup_pi5.sh` für Pi 5 / Bookworm inkl. systemd-Unit, DPMS-aus, 8BitDo-Pairing-Hinweis.
 2. README: `python3 main.py`, `CHAOS_WINDOWED=1`, kurze Spielübersicht, **ohne** die Operator-Kombo preiszugeben (die steht nur hier im Prompt).
-3. Ohne `logo.svg` starten alle sieben mit Fallback.
-4. Mit `logo.svg` ist das Logo in jedem Titel der Avatar (siehe 1.4).
+3. Ohne die drei Logo-SVGs starten alle sieben mit Fallback-Gesicht/C/Badge.
+4. Mit den SVGs ist CHAOS in jedem Titel der Held (siehe 1.4). DK und Frogger haben Strichbeine; Gegner nie das Logo.
 5. Tastatur allein reicht für alle Spiele inkl. Action (Space).
 6. Kein Netzwerk, kein Runtime-pip, keine Telemetrie.
 7. Bezeichner Englisch wie in diesem Dokument; keine `TODO`/`pass` in Gameplay-Pfaden.
@@ -943,7 +1043,8 @@ python3 main.py
 - [ ] 12 s Idle → Attract **desselben** Titels (keine Titelrotation); Input → SELECT.
 - [ ] 30 s Idle in PLAYING → SELECT, kein Highscore-Write.
 - [ ] Highscores getrennt pro Game, inkl. Name, überleben Neustart; Legacy-`entries` → PACMAN mit `name = "---"`.
-- [ ] Logo-Pipeline cairosvg → pygame → Fallback, Logs auf stdout.
+- [ ] Logo-Pipeline FACE/MARK/BADGE, cairosvg → pygame → Fallback, Logs auf stdout.
+- [ ] CHAOS-Logo ist in jedem Titel der Held. Gegner nie das Logo. Nur DK und Frogger haben Strichbein/-arm.
 - [ ] 8BitDo D-Pad, Analog, A/Start/Select und Keyboard parallel; Action ist Edge; Start gehalten + Richtung = Operator, nicht Spielstart.
 - [ ] Fullscreen-Kiosk, Cursor aus, Shift+Q beendet.
 - [ ] ≥ 50 FPS in jedem aktiven Spiel.
@@ -954,7 +1055,7 @@ python3 main.py
 
 ### 5.B Donkey Kong
 
-- [ ] Laufen, Leitern, Sprung, Fässer mit Träger-Logik, Ziel oben, Zeitlimit, Fass-Skip-Punkte, 3 Leben.
+- [ ] Laufen, Leitern, Sprung, True-up-Rollen mit Träger-Logik, Ziel oben, Zeitlimit, Skip-Punkte, 3 Leben. Held = MARK + Strichbein. Boss ohne Logo.
 
 ### 5.C Snake
 
@@ -966,7 +1067,7 @@ python3 main.py
 
 ### 5.E Frogger
 
-- [ ] Edge-Hops, Autos, Logs, Wasser-Tod, 5 Nester, Timer, Level nach Full-Home.
+- [ ] Edge-Hops, Renewal-Autos, Tenant-Flöße, Wasser-Tod, 5 Kostenstellen, Timer, Level nach Full-Home. Held = FACE + Strichbein.
 
 ### 5.F Invaders
 
@@ -982,7 +1083,7 @@ python3 main.py
 
 1. Existieren `GameMode` und sieben Mode-Klassen, auch wenn noch in `main.py` gebündelt?
 2. Eine Shared-Quelle für Display/Input/Logo/Highscore/Cabinet?
-3. Wird `logo.svg` niemals pro Frame gerastert — auch nicht für Bubble-Winkel (Cache!)?
+3. Werden FACE/MARK/BADGE niemals pro Frame gerastert — auch nicht für Bubble-Winkel (Cache!)? Werden Strichbeine zur Laufzeit gezeichnet, nicht ins SVG gebrannt?
 4. Sind Diagonalen in Pac-Man/Snake/Frogger unmöglich? (DK: in der Luft begrenztes Strafen erlaubt, kein 8-Wege-Run. Invaders/Breakout: nur L/R.)
 5. Kann das Kabinett 2 Minuten ohne Input im Select/Attract-Zyklus **desselben** featured Game allein laufen?
 6. Sind `data/highscores.json` und `data/cabinet.json` gitignored?
@@ -991,5 +1092,6 @@ python3 main.py
 9. Wird kein Highscore ohne gültigen Namen (3–8, `[A-Z0-9-]`) oder mit Blocklist-Treffer geschrieben?
 10. Ist die Operator-Kombo nirgends im HUD oder in der README erklärt?
 11. Startet die systemd-Unit das Spiel nach einem Crash von selbst neu?
+12. Ist CHAOS in jedem Titel der einzige Held? Tragen Gegner nirgends das Logo? Haben nur DK und Frogger Strichgliedmaßen?
 
 Ende des Master-Prompts. Dieses Dokument ist die einzige Wahrheitsquelle für die Code-Generierung.
