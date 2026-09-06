@@ -12,7 +12,7 @@
 **Operator-Spielwechsel:** nur über versteckte Tastenkombination (siehe 2.3.5)  
 **Highscore:** Namenspflicht, Top-10 **je Spiel**, sichtbar in jedem Nicht-Spiel-State  
 
-**Spielkatalog (verbindlich, genau diese fünf, in dieser Reihenfolge):**
+**Spielkatalog (verbindlich, genau diese sieben, in dieser Reihenfolge — Maximum, keine weiteren Titel):**
 
 | `GameId` | UI-Titel | Genre-Vorbild | Kernschleife (Messe, 30–90 s) |
 |---|---|---|---|
@@ -21,8 +21,12 @@
 | `SNAKE` | SNAKE | Snake | Wachsen, nicht selbst treffen |
 | `BUBBLE_SHOT` | BUBBLE SHOT | Puzzle Bobble / Bubble Shooter | Zielen, schießen, 3er-Match |
 | `FROGGER` | FROGGER | Frogger | Straßen/Fluss queren, 5 Ziele |
+| `INVADERS` | INVADERS | Space Invaders | Formation, schießen, Wellen |
+| `BREAKOUT` | BREAKOUT | Breakout | Schläger, Ball, Steine |
 
-Dieses Dokument ist verbindlich. CHAOS Arcade ist **kein** reiner Pac-Man-Klon. Pac-Man ist das **erste** Spiel im Kabinett und der **Default** nach Erststart, nicht das einzige. Besucher spielen immer nur das vom Operator freigeschaltete Spiel. Jede nachfolgende Implementierung muss sich **wortgetreu** an diese Vorgaben halten. Abweichungen sind nur zulässig, wenn sie einen Laufzeitfehler auf dem Raspberry Pi 5 verhindern — und müssen dann im Code kommentiert werden.
+Bewusst **nicht** im Katalog (auch nicht als späterer Nachzug): Tetris-Klone (Marke + zu lange Partien), Endless Runner (überlappt Frogger), Top-Down-Racer (Session zu lang), Q*bert (Diagonale), Pinball (zwei Flipper). Das Kabinett ist mit sieben Titeln voll.
+
+Dieses Dokument ist verbindlich. CHAOS Arcade ist **kein** reiner Pac-Man-Klon. Pac-Man ist das **erste** Spiel im Kabinett und der **Default** nach Erststart, nicht das einzige. Es gibt genau **sieben** Titel. Besucher spielen immer nur das vom Operator freigeschaltete Spiel. Jede nachfolgende Implementierung muss sich **wortgetreu** an diese Vorgaben halten. Abweichungen sind nur zulässig, wenn sie einen Laufzeitfehler auf dem Raspberry Pi 5 verhindern — und müssen dann im Code kommentiert werden.
 
 Rechtlicher Rahmen: Es werden **keine** originalen ROM-Assets, Sprites, Melodien oder Markenzeichen Dritter eingebettet. Mechanik und Feeling dürfen anklingen; visuelle Identität ist ausschließlich CHAOS (Logo + Neon-Palette).
 
@@ -37,7 +41,8 @@ CHAOS Arcade ist ein **Multi-Game-Mitmach-Kabinett mit gesperrtem Titel**. Ein M
 - Es gibt **kein** öffentliches Spielemenü, **kein** Carousel, **kein** Dateimenü, **kein** OS-UI, **kein** Beenden über sichtbare Buttons.
 - Links/Rechts **wechselt das Spiel nicht**. Spielwechsel nur über die Operator-Kombination (2.3.5). Kein On-Screen-Hinweis darauf.
 - Vollbild-Verlassen nur über verstecktes Operator-Hotkey (siehe 2.3.4 / 2.5).
-- Jedes der fünf Spiele muss **allein mit Stick + einem Action-Button** bedienbar sein. Namenseingabe ebenfalls nur mit Stick + Action/Start.
+- Jedes der sieben Spiele muss **allein mit Stick + einem Action-Button** bedienbar sein. Namenseingabe ebenfalls nur mit Stick + Action/Start.
+- Median-Runde eines Erstspielers: **45–75 s** bis GAME_OVER. Zu schwer → Tempo/Dichte senken, keine Tutorials. Zu leicht → nur über Level nachziehen, nicht über neue Tasten.
 - Typische Runde: **30–90 Sekunden**. Kein Spiel darf eine Einarbeitungszeit > 3 Sekunden brauchen.
 - Das Firmenlogo ist in **allen** Spielen der Avatar (Mund/Kopf, Kletterer, Schlangenkopf, Kanone/Kugel, Springer).
 - Solange **nicht** gespielt wird (`GAME_SELECT`, `ATTRACT_MODE`, `GAME_OVER`, `NAME_ENTRY`), ist die **Top-10 des aktuellen Spiels** sichtbar — mit Rang, Name, Score.
@@ -59,7 +64,7 @@ CHAOS Arcade ist ein **Multi-Game-Mitmach-Kabinett mit gesperrtem Titel**. Ein M
 - Kein per-frame SVG-Re-Rendering. Vektoren werden **einmal** beim Start (und bei Fenster-Resize) in Surfaces gerastert.
 - Pro Frame maximal die aktive Spielszene plus HUD. Inaktive Games werden nicht simuliert (außer Attract-Demo des featured Game).
 - Keine Blocking-I/O im Game-Loop. Highscore-Schreiben erfolgt atomar und kurz.
-- Ziel: stabil ≥ 50 FPS auf Pi 5 bei 1280×720, **in jedem** der fünf Spiele.
+- Ziel: stabil ≥ 50 FPS auf Pi 5 bei 1280×720, **in jedem** der sieben Spiele.
 
 ### 0.4 Code-Qualität
 
@@ -99,9 +104,15 @@ CHAOS_PacMan/
 │   ├── bubble_shot/
 │   │   ├── grid.py
 │   │   └── mode.py
-│   └── frogger/
-│       ├── lanes.py
-│       └── mode.py
+│   ├── frogger/
+│   │   ├── lanes.py
+│   │   └── mode.py
+│   ├── invaders/
+│   │   ├── waves.py
+│   │   └── mode.py         # InvadersMode(GameMode)
+│   └── breakout/
+│       ├── bricks.py
+│       └── mode.py         # BreakoutMode(GameMode)
 ├── attract.py              # Demo nur des featured Game; keine Titelrotation
 ├── assets/
 │   └── logo.svg            # Firmenlogo (kann fehlen)
@@ -115,7 +126,7 @@ CHAOS_PacMan/
 └── README.md
 ```
 
-Die erste Auslieferung darf alles in `main.py` vereinen, **muss** aber `GameId`, `GameMode`, `CabinetStore`, `HighscoreStore`, `StateId.NAME_ENTRY` und die fünf Mode-Klassen (`PacmanMode`, `DonkeyKongMode`, `SnakeMode`, `BubbleShotMode`, `FroggerMode`) namentlich enthalten.
+Die erste Auslieferung darf alles in `main.py` vereinen, **muss** aber `GameId`, `GameMode`, `CabinetStore`, `HighscoreStore`, `StateId.NAME_ENTRY` und die sieben Mode-Klassen (`PacmanMode`, `DonkeyKongMode`, `SnakeMode`, `BubbleShotMode`, `FroggerMode`, `InvadersMode`, `BreakoutMode`) namentlich enthalten.
 
 ### 0.6 Visuelle Identität (Arcade / CHAOS)
 
@@ -136,6 +147,8 @@ Akzente pro Spiel (nur Level-Geometrie, nicht das Logo):
 | SNAKE | `#2DE2E6` | Dunkelgrid, Food bernstein |
 | BUBBLE_SHOT | `#3BD1FF` | Kugelfarben aus der CHAOS-Palette |
 | FROGGER | `#3BD1FF` / `#FF3B3B` | Straße dunkel, Wasser cyan-dunkel, Ziele bernstein |
+| INVADERS | `#FF7AD9` | Sternenfeld, Formation pink/cyan, Schüsse bernstein |
+| BREAKOUT | `#FFB703` | Steinreihen in der CHAOS-Palette, Schläger cyan |
 
 ---
 
@@ -153,8 +166,10 @@ Akzente pro Spiel (nur Level-Geometrie, nicht das Logo):
 | `logo_tile` | `TILE_SIZE - 4` (Default 28) | Pac-Man, Snake-Kopf, Frogger |
 | `logo_dk` | 36 | Donkey-Kong-Kletterer |
 | `logo_cannon` | 48 | Bubble-Shot-Kanone |
-| `logo_bubble` | 28 | Bubble-Shot-Kugel (getintet) |
+| `logo_bubble` | 28 | Bubble-Shot-Kugel, Breakout-Ball (getintet) |
 | `logo_snake_body` | 24 | Snake-Körper (getintet, 70 % Alpha) |
+| `logo_ship` | 36 | Invaders-Kanone, Facing UP |
+| `logo_paddle` | 40 | Breakout: zentriert auf dem Schläger-Rect, nicht strecken |
 
 `TILE_SIZE = 32` bleibt die Shared-Grid-Basis. Einzelne Games dürfen eigene Zellengrößen nutzen, beziehen sie aber aus `config.py`.
 
@@ -200,7 +215,7 @@ Einmal vier Richtungs-Surfaces pro Größe cachen. Basis: Logo schaut nach **rec
 | DOWN | `rotate(base, -90)` + `_fit_square` |
 
 - Niemals `rotozoom` pro Frame, niemals SVG neu parsen.
-- `tint_surface(surf, color)` einmalig für Snake-Körper, Frightened-Geister, Bubble-Farben.
+- `tint_surface(surf, color)` einmalig für Snake-Körper, Frightened-Geister, Bubble-Farben, Breakout-Ball.
 
 ### 1.4 Nutzungsregeln pro Spiel
 
@@ -211,6 +226,8 @@ Einmal vier Richtungs-Surfaces pro Größe cachen. Basis: Logo schaut nach **rec
 | SNAKE | Kopf = `logo_tile[facing]`; Körper = `logo_snake_body` getintet `#2DE2E6` |
 | BUBBLE_SHOT | Kanone = `logo_cannon` rotiert auf **diskrete Winkelschritte** (gecachte 2°-Raster-Surfaces, 0…180° bzw. −80…+80); fliegende Kugel = `logo_bubble` getintet in Schussfarbe |
 | FROGGER | `logo_tile[facing]`; Idle schaut UP |
+| INVADERS | `logo_ship` fest Facing UP; Schüsse = Primitive |
+| BREAKOUT | Schläger-Rect + `logo_paddle` mittig; Ball = `logo_bubble` |
 
 Bubble-Shot-Rotation: Winkel-Cache beim Start in 2°-Schritten, **kein** per-frame `rotozoom` auf das SVG.
 
@@ -242,6 +259,8 @@ registry = {
     SNAKE: SnakeMode,
     BUBBLE_SHOT: BubbleShotMode,
     FROGGER: FroggerMode,
+    INVADERS: InvadersMode,
+    BREAKOUT: BreakoutMode,
 }
 featured = CabinetStore.load()          # persistiert; Default PACMAN
 state = GAME_SELECT                     # Idle des featured Game — kein öffentliches Menü
@@ -371,7 +390,9 @@ Datei: `data/highscores.json`
     "DONKEY_KONG": [],
     "SNAKE": [],
     "BUBBLE_SHOT": [],
-    "FROGGER": []
+    "FROGGER": [],
+    "INVADERS": [],
+    "BREAKOUT": []
   }
 }
 ```
@@ -381,7 +402,7 @@ Datei: `data/highscores.json`
 - Pro `GameId` maximal 10 Einträge, sortiert `score` desc, dann `ts` desc.
 - `name` ist Pflicht: 3–8 Zeichen aus `[A-Z0-9-]`. Fehlt oder ungültig → **kein Write**.
 - Atomar: `highscores.json.tmp` + `os.replace`.
-- Corrupt → leere Listen für alle fünf Keys, Rebuild beim Write.
+- Corrupt → leere Listen für alle sieben Keys, Rebuild beim Write.
 - Altes Schema ohne `games`-Map (nur `entries`) einmalig nach `PACMAN` migrieren.
 - Legacy-Einträge ohne `name` → `name = "---"` (einmalig, bleiben stehen, zählen in die Top-10).
 - Score `0` wird nie geschrieben.
@@ -414,7 +435,7 @@ Kein HUD-Hinweis auf irgendeine dieser Kombinationen.
 - `Q` + `Left-Shift`: Beenden.
 - `F11`: Fullscreen toggle (Dev).
 - `R` + `Left-Shift`: Highscores **aller** Spiele löschen (featured Game bleibt).
-- `1`…`5`: stille Direktwahl des featured Game (Dev/Operator), erlaubt in `GAME_SELECT`, `ATTRACT_MODE` und in `GAME_OVER` **ohne** Qualifikation — nicht in `PLAYING` / `NAME_ENTRY` / qualifiziertem `GAME_OVER`.
+- `1`…`7`: stille Direktwahl des featured Game (Dev/Operator, Katalogreihenfolge), erlaubt in `GAME_SELECT`, `ATTRACT_MODE` und in `GAME_OVER` **ohne** Qualifikation — nicht in `PLAYING` / `NAME_ENTRY` / qualifiziertem `GAME_OVER`.
 
 #### 2.3.5 Operator-Spielwechsel (verbindlich)
 
@@ -427,9 +448,9 @@ Kein HUD-Hinweis auf irgendeine dieser Kombinationen.
 | Tastatur | `K_LSHIFT` |
 | 8BitDo / Gamepad | Button **6 oder 8** (Select) **oder** Button **7 oder 9** (Start), gehalten. **Nicht** Button 0/1 (Action). |
 
-**Schaltgeste:** Modifier gehalten + `Left`/`Right` Edge → `featured` ± 1, Wrap Pac-Man ↔ Frogger. Sofort `CabinetStore.save`. Titel + Top-10 wechseln in derselben Frame-Logik.
+**Schaltgeste:** Modifier gehalten + `Left`/`Right` Edge → `featured` ± 1, Wrap Pac-Man ↔ Breakout. Sofort `CabinetStore.save`. Titel + Top-10 wechseln in derselben Frame-Logik.
 
-Zusätzlich Dev: Tasten `1`…`5` (siehe 2.3.4).
+Zusätzlich Dev: Tasten `1`…`7` (siehe 2.3.4).
 
 Regeln:
 
@@ -459,6 +480,21 @@ HI-SCORE  PAC-MAN
 - Lesbar ab 1,5 m: Zeilenhöhe ≥ 28 px, Farbe Warmweiß, Rang-1 Bernstein.
 - `highlight_rank` (nach neuer Qualifikation / während NAME_ENTRY): diese Zeile blinkt cyan.
 - Immer genau 10 Zeilen, auch wenn weniger Einträge existieren.
+
+#### 2.3.7 Namensfilter
+
+`config.NAME_BLOCKLIST`: kurze, interne Substring-Liste (casefold). Treffer → kein Write, Cursor bleibt in `NAME_ENTRY`, Hinweis `NAME UNGÜLTIG` 1,2 s. Die Liste steht **nicht** in README oder HUD. Leere Liste ist unzulässig — mindestens ein Platzhalter-Eintrag im Code, echte Wörter darf der Operator in `config.py` pflegen.
+
+#### 2.3.8 Kiosk-Härtung (Pi 5 / 8BitDo)
+
+Pflichtbestandteil von `setup_pi5.sh` und der Shell, nicht optional „später“:
+
+- systemd-Unit `chaos-arcade.service`: `Restart=always`, `RestartSec=2`, WorkingDirectory = Repo, `ExecStart=/usr/bin/python3 main.py`. Watchdog: Prozess muss mindestens alle 10 s ein `WATCHDOG=1` schreiben **oder** die Unit kommt ohne sd_notify aus und verlässt sich auf Restart bei Exit ≠ 0. Beides ist zulässig; Absturz darf das Kabinett nicht schwarz lassen.
+- Screen-Blank und DPMS aus (`xset s off`, `xset -dpms` bzw. Wayland-Äquivalent). `pygame.mouse.set_visible(False)` bleibt.
+- HDMI als Audio-Default, Mixer-Fehler weiter ignorieren.
+- 8BitDo DIY Kit: Standard-HID, nicht Switch-Modus. Skript dokumentiert nur „im OS einmalig pairen, dann reboot“ — kein Runtime-Bluetooth-Scan im Game.
+- Burn-in-Schutz: nach `BURN_IN_IDLE_SECONDS = 180` im Select/Attract-Loop HUD und Top-10 alle 30 s um ±2 px versetzen. Kein Dimmen unter Lesbarkeit.
+- Kein Netzwerkstack im Spielprozess.
 
 ### 2.4 Gamepad / Keyboard Event-Loop
 
@@ -518,13 +554,15 @@ Wenn `operator_switch != 0`, setzt die Shell `dx = 0` für die öffentliche Sema
 | SNAKE | queued Richtung, kein 180° in sich selbst | ignoriert |
 | BUBBLE_SHOT | L/R dreht Kanone, U/D grob (größerer Winkelschritt) | Schuss (Edge) |
 | FROGGER | ein Rasterschritt pro Tastendruck (Edge, nicht gehalten) | ignoriert (optional: Action = Hop nach oben) |
+| INVADERS | L/R gehalten bewegen, U/D ignoriert | Schuss (Edge), max. 1 Kugel, Cooldown 0.28 s |
+| BREAKOUT | L/R gehalten Schläger, U/D ignoriert | Ball starten (Edge), nur solange der Ball klebt |
 
 ### 2.5 Robustheit
 
 - `SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1` vor `pygame.init()`.
 - Mixer-Fehler → `audio_enabled = False`.
 - Font: DejaVu Sans Mono Bold falls vorhanden, sonst `Font(None, size)`.
-- Uncaught Exception: loggen, 2 s warten, hart `GAME_SELECT`. Ein Game-Crash darf die anderen vier nicht töten — `GameMode.update` in try/except der Shell.
+- Uncaught Exception: loggen, 2 s warten, hart `GAME_SELECT`. Ein Game-Crash darf die anderen sechs nicht töten — `GameMode.update` in try/except der Shell.
 
 ### 2.6 GameMode-Protokoll
 
@@ -552,7 +590,7 @@ class GameMode(ABC):
 Gemeinsam:
 
 - Interne Szene unter dem 80-px-HUD, optional 96-px-Fußzeile mit `CHAOS` + Kurzsteuerung.
-- 3 Leben, sofern das Spiel Leben hat (Snake: 1 Leben / Sofort-Out, dann GAME_OVER — siehe 3.C).
+- 3 Leben, sofern das Spiel Leben hat (Snake: 1 Leben / Sofort-Out, dann GAME_OVER — siehe 3.C). Invaders und Breakout: 3 Leben.
 - Level-Steigerung erhöht Tempo oder Dichte, nie die Steuerung umbauen.
 
 ---
@@ -778,23 +816,102 @@ Von unten nach oben:
 
 ---
 
+### 3.F INVADERS
+
+Messe-Shmup: eine Formation, schießen, Wellen. Gefühl Space Invaders, keine originalen Sprite-Roms, keine Galaga-Challenging-Stage.
+
+#### 3.F.1 Feld
+
+Playfield 720×560, zentriert unter dem HUD. 40 px Seitenrand. Spieler-Schiff auf `y = play_bottom - 40`. Kein Wrap — am Rand stoppen (Messe: klare Grenze).
+
+#### 3.F.2 Spieler
+
+- LEFT/RIGHT gehalten: 320 px/s.
+- Action-Edge: eine Kugel nach oben, 520 px/s. Maximal **eine** eigene Kugel gleichzeitig. Zusätzlicher Cooldown 0.28 s.
+- Treffer durch Bomben oder Kontakt mit Invader: Leben −1, Freeze 1.2 s, INVULN 2.0 s, Formation bleibt.
+- 0 Leben → GAME_OVER.
+- Logo: `logo_ship`, Facing UP fest.
+
+#### 3.F.3 Formation
+
+- Level 1: 5 Reihen × 8 Spalten, Zelle 36 px, Abstand 8 px.
+- Farben zeilenweise aus der CHAOS-Palette (unten billig, oben teuer).
+- Blockbewegung: 40 px/s Level 1, am Rand umkehren und 12 px sinken. Tempo `* 1.10` je Welle, plus `* 1.04` je getötetem Invader (klassische Beschleunigung).
+- Globaler Bomben-Takt: alle 1.2 s Level 1, −0.08 s/Welle, min 0.45 s. Zufällige lebende untere Kante schießt. Bombe 220 px/s nach unten, Primitive.
+- Unterkante der Formation erreicht Spieler-y → sofort GAME_OVER (alle Restleben verloren).
+- Welle leer: +500, nächste Welle (max. 6 Reihen). UFO optional alle 12 s oben durch, 150 Punkte, 180 px/s, Primitive + Mini-Logo 16 px.
+
+#### 3.F.4 Scoring
+
+| Event | Punkte |
+|---|---|
+| Invader Reihe 1 (unten) … 5 (oben) | 10 / 20 / 30 / 40 / 50 |
+| UFO | 150 |
+| Welle frei | 500 |
+
+#### 3.F.5 Darstellung
+
+- Invader: Rechtecke/Diamanten, 2 px Outline, kein Copyright-Sprite.
+- Hintergrund: 40 statische Sterne (einmal generiert, Position + Parallax 8 px — brennt nicht ein).
+- Attract: Schiff pendelt und schießt deterministisch.
+
+---
+
+### 3.G BREAKOUT
+
+Schläger unten, Ball, Steinwand oben. Gefühl Breakout, keine Arkanoid-Powerups, keine ROM-Sprites.
+
+#### 3.G.1 Feld
+
+Playfield 800×560, zentriert. Wände links/rechts/oben 12 px cyan. Unten offen.
+
+#### 3.G.2 Schläger und Ball
+
+- Schläger: 96×18 px, 420 px/s, LEFT/RIGHT gehalten, stoppt am Innenrand. `logo_paddle` zentriert auf dem Rect.
+- Ball: Radius 8 px, `logo_bubble` 20 px. Start klebt auf dem Schläger, bis Action-Edge ihn startet (Anfang `vy < 0`, `vx` aus Schläger-Offset).
+- Startspeed 360 px/s, `* 1.04` je zerstörtem Stein, Maximum 620 px/s.
+- Kollision Schläger: Winkel aus Trefferoffset, max. ±55° gegen die Senkrechte, `|vy|` bleibt aufwärts. Nie flach horizontal.
+- Wand: `vx` bzw. `vy` invertieren. Decke spiegelt `vy`.
+- Ball verlässt unten: Leben −1, Ball klebt wieder. 0 Leben → GAME_OVER.
+
+#### 3.G.3 Steine
+
+- Level 1: 6 Reihen × 10 Spalten, Stein 72×22, Gap 4 px, oberer Offset 24 px.
+- Reihenfarben CHAOS-Palette. Punkte oben → unten: 30 / 25 / 20 / 15 / 10 / 10.
+- Keine unzerstörbaren Steine auf Level 1. Ab Level 2: genau 4 graue 2-Hit-Steine (Outline dick).
+- Feld leer: +500, nächste Wand (eine Reihe mehr, max. 8; Speed-Reset auf `360 * 1.06^(level-1)`).
+
+#### 3.G.4 Scoring und Leben
+
+- 3 Leben. Steinpunkte + Clear 500. Kein Zeitbonus (Tempo ist die Uhr).
+- Keine Powerups (Multiball, Laser, Enlarge) — eine Taste, eine Regel.
+
+#### 3.G.5 Darstellung
+
+- Steine: gefüllte Rects + 2 px Outline.
+- Attract: Schläger folgt dem Ball deterministisch mit 70 % Speed (darf verlieren und resetten, kein Score).
+
+---
+
 ## 4. Implementierungsauftrag
 
-Reihenfolge **zwingend** (jedes Game nach Shell spielbar committen, nicht fünf halbfertige):
+Reihenfolge **zwingend** (jedes Game nach Shell spielbar committen, nicht sieben halbfertige):
 
-1. Shared Shell: Display, Input, LogoAsset, Highscore inkl. Name, CabinetStore, GAME_SELECT-Idle + Top-10-Tafel, Operator-Switch, ATTRACT-Gerüst (nur featured), GAME_OVER, NAME_ENTRY.
+1. Shared Shell: Display, Input, LogoAsset, Highscore inkl. Name, CabinetStore, GAME_SELECT-Idle + Top-10-Tafel, Operator-Switch, ATTRACT-Gerüst (nur featured), GAME_OVER, NAME_ENTRY, Namensfilter, Burn-in-Shift.
 2. `PacmanMode` vollständig (Abnahme §5.A). Featured-Default = PACMAN.
 3. `SnakeMode` (schnellster zweiter Titel). Operator kann darauf schalten, sobald spielbar.
 4. `FroggerMode`.
-5. `BubbleShotMode`.
-6. `DonkeyKongMode`.
-7. Attract spielt **nur** das featured Game. Ein unfertiger Titel darf **nicht** per Operator erreichbar sein. Zielstand: alle fünf fertig und per Kombo wählbar. Kein `Coming Soon`, kein öffentliches Carousel.
+5. `InvadersMode`.
+6. `BreakoutMode`.
+7. `BubbleShotMode`.
+8. `DonkeyKongMode`.
+9. Attract spielt **nur** das featured Game. Ein unfertiger Titel darf **nicht** per Operator erreichbar sein. Zielstand: alle sieben fertig und per Kombo wählbar. Kein `Coming Soon`, kein öffentliches Carousel. Kein achter Titel.
 
 Weitere Regeln:
 
-1. `requirements.txt` + `setup_pi5.sh` für Pi 5 / Bookworm.
+1. `requirements.txt` + `setup_pi5.sh` für Pi 5 / Bookworm inkl. systemd-Unit, DPMS-aus, 8BitDo-Pairing-Hinweis.
 2. README: `python3 main.py`, `CHAOS_WINDOWED=1`, kurze Spielübersicht, **ohne** die Operator-Kombo preiszugeben (die steht nur hier im Prompt).
-3. Ohne `logo.svg` starten alle fünf mit Fallback.
+3. Ohne `logo.svg` starten alle sieben mit Fallback.
 4. Mit `logo.svg` ist das Logo in jedem Titel der Avatar (siehe 1.4).
 5. Tastatur allein reicht für alle Spiele inkl. Action (Space).
 6. Kein Netzwerk, kein Runtime-pip, keine Telemetrie.
@@ -816,7 +933,9 @@ python3 main.py
 - [ ] Start auf Pi 5 und Desktop (windowed) ohne Crash, ohne SVG, ohne Gamepad.
 - [ ] Idle zeigt **ein** featured Game (Default PACMAN) plus dessen vollständige Top-10. Kein Carousel, keine Nachbar-Titel, keine Wähl-Pfeile.
 - [ ] Öffentliches Links/Rechts wechselt das Spiel **nicht**. Shift+Links/Rechts bzw. Start/Select gehalten + Links/Rechts wechselt featured (Wrap), persistiert in `cabinet.json`, loggt `[operator]`.
-- [ ] Tasten `1`…`5` schalten featured still; unfertige Titel sind nicht erreichbar.
+- [ ] Tasten `1`…`7` schalten featured still; unfertige Titel sind nicht erreichbar.
+- [ ] Namensfilter blockt `NAME_BLOCKLIST` ohne Write.
+- [ ] `setup_pi5.sh` legt Restart-Unit an und schaltet Screen-Blank ab. Nach 180 s Idle ±2 px Burn-in-Shift.
 - [ ] Start/Action lädt das featured Spiel; Game-Over kehrt zum Idle **desselben** Titels zurück (außer Operator hat danach umgeschaltet).
 - [ ] Qualifizierter Score öffnet NAME_ENTRY; Absenden erst ab 3 Zeichen; Write nur mit Name. Timeout 20 s verwirft den Score.
 - [ ] Unqualifizierter Score (0 oder unter Platz 10 bei voller Liste): kein NAME_ENTRY, kein Write.
@@ -849,19 +968,28 @@ python3 main.py
 
 - [ ] Edge-Hops, Autos, Logs, Wasser-Tod, 5 Nester, Timer, Level nach Full-Home.
 
+### 5.F Invaders
+
+- [ ] L/R-Schiff, ein Schuss, Formation mit Kanten-Drop und Tempo-up, Bomben, 3 Leben, Welle-Clear, Bodenkontakt = Out.
+
+### 5.G Breakout
+
+- [ ] Schläger, klebender Startball, Winkel über Trefferoffset, Steinwand, Speed-up, 3 Leben, kein Powerup.
+
 ---
 
 ## 6. Self-Check vor dem Commit der Implementierung
 
-1. Existieren `GameMode` und fünf Mode-Klassen, auch wenn noch in `main.py` gebündelt?
+1. Existieren `GameMode` und sieben Mode-Klassen, auch wenn noch in `main.py` gebündelt?
 2. Eine Shared-Quelle für Display/Input/Logo/Highscore/Cabinet?
 3. Wird `logo.svg` niemals pro Frame gerastert — auch nicht für Bubble-Winkel (Cache!)?
-4. Sind Diagonalen in Pac-Man/Snake/Frogger unmöglich? (DK: in der Luft begrenztes Strafen erlaubt, kein 8-Wege-Run.)
+4. Sind Diagonalen in Pac-Man/Snake/Frogger unmöglich? (DK: in der Luft begrenztes Strafen erlaubt, kein 8-Wege-Run. Invaders/Breakout: nur L/R.)
 5. Kann das Kabinett 2 Minuten ohne Input im Select/Attract-Zyklus **desselben** featured Game allein laufen?
 6. Sind `data/highscores.json` und `data/cabinet.json` gitignored?
-7. Gibt es **kein** öffentliches Carousel und keinen `Coming Soon`-Slot? Ist Spielwechsel ausschließlich die Operator-Kombo?
+7. Gibt es **kein** öffentliches Carousel, keinen achten Titel und keinen `Coming Soon`-Slot? Ist Spielwechsel ausschließlich die Operator-Kombo?
 8. Crash in einem Mode fängt die Shell und kehrt zu SELECT zurück?
-9. Wird kein Highscore ohne gültigen Namen (3–8, `[A-Z0-9-]`) geschrieben?
+9. Wird kein Highscore ohne gültigen Namen (3–8, `[A-Z0-9-]`) oder mit Blocklist-Treffer geschrieben?
 10. Ist die Operator-Kombo nirgends im HUD oder in der README erklärt?
+11. Startet die systemd-Unit das Spiel nach einem Crash von selbst neu?
 
 Ende des Master-Prompts. Dieses Dokument ist die einzige Wahrheitsquelle für die Code-Generierung.
