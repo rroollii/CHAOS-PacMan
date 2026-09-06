@@ -28,7 +28,9 @@ Bewusst **nicht** im Katalog (auch nicht als späterer Nachzug): Tetris-Klone (M
 
 Dieses Dokument ist verbindlich. CHAOS Arcade ist **kein** reiner Pac-Man-Klon. Pac-Man ist das **erste** Spiel im Kabinett und der **Default** nach Erststart, nicht das einzige. Es gibt genau **sieben** Titel. Besucher spielen immer nur das vom Operator freigeschaltete Spiel. Jede nachfolgende Implementierung muss sich **wortgetreu** an diese Vorgaben halten. Abweichungen sind nur zulässig, wenn sie einen Laufzeitfehler auf dem Raspberry Pi 5 verhindern — und müssen dann im Code kommentiert werden.
 
-Rechtlicher Rahmen: Es werden **keine** originalen ROM-Assets, Sprites, Melodien oder Markenzeichen Dritter eingebettet — auch **keine** Microsoft-/Office-/Windows-/Azure-Bildmarken und keine Produktnamen wie E3, E5, M365. Mechanik und Feeling der Arcade-Vorbilder dürfen anklingen; Gegner und Welt sind **Lizenzchaos** (Audit, Shelfware, True-up, SKU, Lock-in, Renewal). Visuelle Identität des Helden ist ausschließlich das CHAOS-Logo.
+Rechtlicher Rahmen: Es werden **keine** originalen ROM-Assets, Sprites oder Melodien Dritter eingebettet und **keine** offiziellen Logo-Dateien (SVG/PNG) von Microsoft oder Nintendo geladen. Keine Produktnamen wie E3, E5, M365 auf dem Screen. Mechanik und Feeling der Arcade-Vorbilder dürfen anklingen; Gegner und Welt sind **Lizenzchaos**. Visuelle Identität des **Helden** ist ausschließlich das CHAOS-Logo.
+
+**Eine** erlaubte Vendor-Anspielung: der Donkey-Kong-Boss (Gorilla) trägt ein per Primitive gezeichnetes Microsoft-Shirt (vier farbige Quadrate + Wort `MICROSOFT`, siehe 3.B.1). Nirgends sonst.
 
 ---
 
@@ -147,7 +149,7 @@ Akzente pro Spiel (nur Level-Geometrie und Gegner, nicht das Logo):
 | Game | Primärakzent | Level-Look |
 |---|---|---|
 | PACMAN | `#2DE2E6` | Neon-Maze, dunkler Innenfill `#12161C` |
-| DONKEY_KONG | `#FF9F1C` | Nieten-Träger, Leitern cyan, Fässer rot |
+| DONKEY_KONG | `#FF9F1C` | Nieten-Träger, Leitern cyan, True-up-Rollen rot, Gorilla oben mit Microsoft-Shirt |
 | SNAKE | `#2DE2E6` | Dunkelgrid, Food bernstein |
 | BUBBLE_SHOT | `#3BD1FF` | Kugelfarben aus der CHAOS-Palette |
 | FROGGER | `#3BD1FF` / `#FF3B3B` | Straße dunkel, Wasser cyan-dunkel, Ziele bernstein |
@@ -736,7 +738,13 @@ Messe-Plattformer, **eine** kompakte Vertragsturm-Szene (kein 4-Board-Original).
 
 - 6 horizontale Träger (Girders), leicht gegenläufig geneigt (±4° optisch, Kollision als Achsen-Segmente).
 - Pro Träger 1–2 Leitern, die den nächsthöheren Träger verbinden. Mindestens ein durchgehender Pfad nach oben.
-- Oben links oder mitte: Boss `ContractActor` — **ENTERPRISE-VERTRAG**, Primitive (breiter Aktenblock + zwei Siegel-Kreise). **Kein** CHAOS-Logo, nicht steuerbar.
+- Oben links oder mitte: Boss `GorillaActor` — ein **Gorilla**, nicht steuerbar, **kein** CHAOS-Logo, kein Nintendo-DK-Sprite. Nur Pygame-Primitive.
+  - Körper: dunkles Braun `#5A3A22`, Kopf-Ellipse, zwei Ohren, lange Arme. Sitz-/Standpose auf dem obersten Träger, Breite ca. 88 px, Höhe ca. 96 px.
+  - **Microsoft-Shirt** (Pflicht): helles Rechteck auf dem Torso (`#F4F1EA`, ca. 44×28 px). Darauf **vier Quadrate** in den Microsoft-Fensterfarben, 2×2, je 9 px, Gap 2 px:
+    oben links `#F35325`, oben rechts `#81BC06`, unten links `#05A6F0`, unten rechts `#FFBA08`.
+    Darunter zentriert der Schriftzug `MICROSOFT` in DejaVu Sans Mono, 10 px, `#0B0D10`.
+  - Keine heruntergeladene Microsoft-Grafik, keine Word-/Azure-Bildmarke, kein Windows-Flaggen-SVG. Nur diese vier Rects + Text.
+  - Wurf-Pose: rechter Arm hebt sich 200 ms, dann TRUEUP-Rolle. Idle: leichtes 1 Hz-Atmen (ScaleY 0.98–1.02, nur Körper, Shirt sitzt fest).
 - Oben rechts: Ziel `GOAL` (Optimierungs-Siegel, bernstein). Berühren = Level-Clear + 500 Punkte + nächste, schnellere Runde.
 - Unten: Player-Spawn.
 
@@ -752,7 +760,7 @@ Interne Playfield-Größe: 960×560, zentriert unter HUD.
 
 #### 3.B.3 Fässer und Gefahr
 
-- `ContractActor` wirft alle `BARREL_INTERVAL` (1.6 s Level 1, −0.12 s/Level, min 0.7 s) eine **TRUEUP-Rolle**.
+- `GorillaActor` wirft alle `BARREL_INTERVAL` (1.6 s Level 1, −0.12 s/Level, min 0.7 s) eine **TRUEUP-Rolle**.
 - Rollen folgen Trägern (rollen in Neigungsrichtung), fallen am Ende eine Ebene tiefer, despawnen unten.
 - 15 % Chance: Rolle wird zum **Fall-Notice** (vertikal, schneller) — telegraphiert durch kürzeres Rect.
 - Kollision Spieler/Rolle: Kreis-Kreis, außer während Sprung **über** die Rolle (Strichfuß-y < Rollen-Oberkante − 4 px) → +100 Punkte, kein Schaden.
@@ -1055,7 +1063,7 @@ python3 main.py
 
 ### 5.B Donkey Kong
 
-- [ ] Laufen, Leitern, Sprung, True-up-Rollen mit Träger-Logik, Ziel oben, Zeitlimit, Skip-Punkte, 3 Leben. Held = MARK + Strichbein. Boss ohne Logo.
+- [ ] Laufen, Leitern, Sprung, True-up-Rollen mit Träger-Logik, Ziel oben, Zeitlimit, Skip-Punkte, 3 Leben. Held = MARK + Strichbein. Oben ein Gorilla mit Primitive-Microsoft-Shirt (4 Quadrate + `MICROSOFT`), ohne CHAOS-Logo, ohne offizielle MS-Datei.
 
 ### 5.C Snake
 
